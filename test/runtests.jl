@@ -1,7 +1,7 @@
 using MultiIndexing
 using Test
 
-can_use_jet = VERSION >= v"1.10"
+can_use_jet = VERSION >= v"1.10" && VERSION < v"1.11"
 can_use_jet && using JET
 
 @testset "MultiIndexing.jl" begin
