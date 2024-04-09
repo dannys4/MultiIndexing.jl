@@ -1,16 +1,25 @@
 module MultiIndexing
 
 using StaticArrays, LinearAlgebra
-import Base: getindex, push!
+import Base: getindex, push!, length, iterate
 
 # Represents a set of multi-indices
 # N x dim matrix (dim is dimension of multi-indices, N is number)
 struct MultiIndexSet{d,T}
-    indices::Vector{StaticVector{d,Int}}
+    indices::Vector{SVector{d,Int}}
     reduced_margin::Vector{StaticVector{d,Int}}
     limit::T
     isDownwardClosed::Bool
     maxDegrees::MVector{d,Int}
+end
+
+function MultiIndexSet(indices::Vector{SVector{d,Int}}, limit::T=NoLimiter, calc_reduced_margin=false) where {d,T}
+    reduced_margin = []
+    if calc_reduced_margin
+        throw(ArgumentError("Reduced margin calculation not implemented"))
+    end
+    maxDegrees = MVector{d}(reduce((x,y)->max.(x,y), indices, init=zeros(Int, d)))
+    MultiIndexSet{d,T}(indices, reduced_margin, limit, true, maxDegrees)
 end
 
 # indices: dim x N matrix of multi-indices
@@ -19,16 +28,19 @@ end
 function MultiIndexSet(indices_mat::Matrix{Int}, limit::T=NoLimiter, calc_reduced_margin=false) where {T}
     d = size(indices_mat,1)
     indices = [SVector{d}(indices_mat[:,i]) for i in axes(indices_mat,2)]
-    reduced_margin = []
-    if calc_reduced_margin
-        throw(ArgumentError("Reduced margin calculation not implemented"))
-    end
-    maxDegrees = MVector{d}(maximum(indices_mat, dims=2)[:])
-    MultiIndexSet{d,T}(indices, reduced_margin, limit, true, maxDegrees)
+    MultiIndexSet(indices, limit, calc_reduced_margin)
 end
 
-function Base.getindex(mis::MultiIndexSet{d}, i::Int) where {d}
+function Base.getindex(mis::MultiIndexSet{d}, i) where {d}
     mis.indices[i]
+end
+
+function Base.length(mis::MultiIndexSet{d}) where {d}
+    length(mis.indices)
+end
+
+function Base.iterate(mis::MultiIndexSet{d}, state::Int = 1)::Union{Tuple{SVector{d,Int},Int},Nothing} where {d}
+    return state > length(mis.indices) ? nothing : (mis.indices[state], state+1)
 end
 
 # Creates a matrix of multi-indices of total order p
@@ -148,6 +160,41 @@ function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}, c
     true
 end
 
+"""
+Get all indices of multi-indices in mset limited by the tensor product box of the mset at idx
+
+    allBackwardAncestors(mis, j)
+
+Arguments:
+- mis: MultiIndexSet to get the backward ancestors from
+- j: index of the multi-index to get the backward ancestors of
+
+```
+julia> d, p = 2, 5;
+
+julia> mis = CreateTotalOrder(d, p);
+
+julia> println(visualize_2d(mis))
+X          
+X X        
+X X X      
+X X X X    
+X X X X X  
+X X X X X X
+
+julia> midx = @SVector[2,2]; idx = findfirst(isequal(midx), mis.indices);
+
+julia> ancestors_idx = allBackwardAncestors(mis, idx);
+
+julia> ancestors = MultiIndexSet(mis[ancestors_idx]);
+
+julia> println(visualize_2d(ancestors))
+X X  
+X X X
+X X X
+
+```
+"""
 function allBackwardAncestors(mis::MultiIndexSet{d}, j::Int) where {d}
     idx = mis.indices[j]
     back_indices = CartesianIndices(ntuple(k->0:idx[k], d))
@@ -183,7 +230,7 @@ function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) w
     end
 end
 
-function push!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
+function Base.push!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
     (idx in mis.indices) && return true
     isValid = checkIndexValid(mis, idx)
     mis.isDownwardClosed = isValid
@@ -196,6 +243,28 @@ function push!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
     isValid
 end
 
+"""
+Find the subset of multi-indices that are not the backward neighbors of any other multi-index in the set.
+
+    findReducedFrontier(mis)
+
+```jldoctest
+julia> d, p = 2, 3;
+
+julia> mis = CreateTotalOrder(d, p);
+
+julia> frontier = findReducedFrontier(mis);
+
+julia> length(frontier)
+4
+
+julia> expected_indices = [[0,3], [1,2], [2,1], [3,0]];
+
+julia> all(SVector{d}(e) in mis for e in expected_indices)
+true
+
+```
+"""
 function findReducedFrontier(mis::MultiIndexSet{d}) where {d}
     frontier = Int[]
     unmarked = ones(Bool, length(mis.indices))
@@ -206,20 +275,134 @@ function findReducedFrontier(mis::MultiIndexSet{d}) where {d}
         isnothing(last_unmarked) && break
         # Mark all backward ancestors of last_unmarked
         ancestors = allBackwardAncestors(mis, sorted_idxs[last_unmarked])
-        # @assert any(ancestors .> last_unmarked) "Unmarked index has forward ancestor"
         unmarked[inv_sorted_idxs[ancestors]] .= false
         unmarked[last_unmarked] = false
         push!(frontier, sorted_idxs[last_unmarked])
     end
     frontier
-end # End MultiIndexing
+end
 
-# Gets the smolyak indexing for a multi-index set. Each index represents a tensor-product box.
-# If keep_levels is true, returns a vector of vectors of indices at each level of the Smolyak grid,
-# where index j of the return value corresponds to subtracted tensor products if j is even and
-# positive if j is odd.
-# If keep_levels is false, returns a pair of vectors, where the first is the positive tensor-product quadratures
-# and the second is the subtracted tensor-product quadratures.
+"""
+Visualize a 2D multi-index set as a string with markers for each index.
+
+    visualize_2d(mset_mat, markers)
+
+Arguments:
+- mset: MultiIndexSet{2} or 2 x N matrix of multi-indices
+- markers: a character or array of characters (length N) to use as markers for each index
+
+```jldoctest
+julia> mis = CreateTotalOrder(2, 4);
+
+julia> println(visualize_2d(mis))
+X        
+X X      
+X X X    
+X X X X  
+X X X X X
+
+"""
+function visualize_2d(mset, markers = 'X')
+    if mset isa MultiIndexing.MultiIndexSet
+        mset = reduce(hcat, mset.indices)
+    end
+    @assert size(mset, 1) == 2 "Only 2D visualization supported"
+    chars = fill(' ', (maximum(mset,dims=2) .+ 1)...)
+    for j in axes(mset,2)
+        mark = markers isa Char ? markers : markers[j]
+        chars[end - mset[1,j], mset[2,j]+1] = mark
+    end
+    rows = [join(c, ' ') for c in eachrow(chars)]
+    join(rows, "\n")
+end
+
+function rgb_char(r, g, b, char)
+    "\e[1m\e[38;2;$r;$g;$b;249m$char\e[0m"
+end
+
+"""
+Visualize a two-dimensional mset's smolyak decomposition with colors!
+    
+        visualize_smolyak_2d(mset)
+
+```jldoctest
+julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
+
+julia> println(visualize_smolyak_2d(mis)) # Note colors on [4,0], [1,1] and [0,4] match
+X        
+o        
+o        
+X X      
+X X o o X
+
+"""
+function visualize_smolyak_2d(mset::MultiIndexing.MultiIndexSet)
+    smolyak_indices = MultiIndexing.smolyakIndexing(mset, true)
+    rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
+    mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
+    chars = fill(" ", (mset_max .+ 1)...)
+    for (j,level) in enumerate(smolyak_indices)
+        col = rgb1 * (j-1) + rgb2 * (length(smolyak_indices) - j)
+        for idx in level
+            m_idx = mset.indices[idx]
+            chars[(m_idx .+ 1)...] = rgb_char(col..., 'X')
+            back_indices = MultiIndexing.allBackwardAncestors(mset, idx)
+            for bidx in back_indices
+                m_idx_b = mset.indices[bidx]
+                chars[(m_idx_b .+1)...] = rgb_char(col..., 'o')
+            end
+        end
+    end
+    join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
+end
+
+"""
+Gets the smolyak indexing for a multi-index set. Each index represents a tensor-product box.
+
+    smolyakIndexing(mis, keep_levels)
+
+Arguments:
+- mis: MultiIndexSet to get the Smolyak indexing for
+- keep_levels: if true, return index vectors at each level of the Smolyak grid,
+where we subtract every index in level j if even and add if j is odd. If false, return the positive and negative pairs
+
+```jldoctest
+julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
+
+julia> println(visualize_2d(mis))
+X        
+X        
+X        
+X X      
+X X X X X
+
+julia println(visualize_smolyak_2d(mis)) # Note coloring in CLI
+X        
+o        
+o        
+X X      
+X X o o X
+
+julia> level_indices = smolyakIndexing(mis, true);
+
+julia> level_sets = [MultiIndexSet(mis[li]) for li in level_indices];
+
+julia> println(visualize_2d(level_sets[1]))
+X        
+         
+         
+  X      
+        X
+
+julia> println(visualize_2d(level_sets[2]))
+X  
+  X
+
+julia> println(visualize_2d(level_sets[3]))
+X
+
+```
+"""
 function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where {d,T}
     mi_loop = mis
     frontiers = keep_levels ? Vector{Int}[] : ntuple(_->Int[], 2)
@@ -246,4 +429,33 @@ function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where
     frontiers
 end
 
+function create_example_hyperbolic2d(p)
+    log2p = floor(Int, log2(p))
+    pd2 = p ÷ 2
+    midx_rep = reduce(hcat, [MultiIndexing.tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:log2p-1)])
+    midx_ext = Int[midx_rep [pd2+1:p zeros(pd2)]' [zeros(pd2) pd2+1:p]']
+    MultiIndexing.MultiIndexSet(unique(midx_ext, dims=2))
+end
+
+function create_example_hyperbolic3d(p)
+    log2p = floor(Int, log2(p))
+    pd2 = p ÷ 2
+    mset_rep = []
+    for logp_1 in 0:log2p-1
+        for logp_2 in 0:(log2p-1-logp_1)
+            p_1 = 2^logp_1
+            p_2 = 2^logp_2
+            p_3 = 2^(log2p - (logp_1 + logp_2 + 1))
+            push!(mset_rep, MultiIndexing.tens_prod_mat(@SVector[p_1, p_2, p_3]))
+        end
+    end
+    mset_rep = reduce(hcat, mset_rep)
+    mset_ext = Int[mset_rep [pd2+1:p zeros(pd2) zeros(pd2)]' [zeros(pd2) pd2+1:p zeros(pd2)]' [zeros(pd2) zeros(pd2) pd2+1:p]']
+    MultiIndexing.MultiIndexSet(unique(mset_ext, dims=2))
+end
+
+export CreateTensorOrder, CreateTotalOrder, MultiIndexSet
+export findReducedFrontier, allBackwardAncestors, smolyakIndexing
+export visualize_2d, visualize_smolyak_2d
+export create_example_hyperbolic2d, create_example_hyperbolic3d
 end

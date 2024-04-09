@@ -14,70 +14,6 @@ function create_example_curved(rng, d, p)
     mis
 end
 
-function create_example_hyperbolic2d(p)
-    log2p = floor(Int, log2(p))
-    pd2 = p ÷ 2
-    midx_rep = reduce(hcat, [MultiIndexing.tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:log2p-1)])
-    midx_ext = Int[midx_rep [pd2+1:p zeros(pd2)]' [zeros(pd2) pd2+1:p]']
-    MultiIndexing.MultiIndexSet(unique(midx_ext, dims=2))
-end
-
-function create_example_hyperbolic3d(p)
-    log2p = floor(Int, log2(p))
-    pd2 = p ÷ 2
-    mset_rep = []
-    for logp_1 in 0:log2p-1
-        for logp_2 in 0:(log2p-1-logp_1)
-            p_1 = 2^logp_1
-            p_2 = 2^logp_2
-            p_3 = 2^(log2p - (logp_1 + logp_2 + 1))
-            push!(mset_rep, MultiIndexing.tens_prod_mat(@SVector[p_1, p_2, p_3]))
-        end
-    end
-    mset_rep = reduce(hcat, mset_rep)
-    mset_ext = Int[mset_rep [pd2+1:p zeros(pd2) zeros(pd2)]' [zeros(pd2) pd2+1:p zeros(pd2)]' [zeros(pd2) zeros(pd2) pd2+1:p]']
-    MultiIndexing.MultiIndexSet(unique(mset_ext, dims=2))
-end
-
-function viz_2d(mset_mat, markers = 'X')
-    if mset_mat isa MultiIndexing.MultiIndexSet
-        mset_mat = reduce(hcat, mset_mat.indices)
-    end
-    @assert size(mset_mat, 1) == 2
-    chars = fill(' ', (maximum(mset_mat,dims=2) .+ 1)...)
-    for j in axes(mset_mat,2)
-        mark = markers isa Char ? markers : markers[j]
-        chars[end - mset_mat[1,j], mset_mat[2,j]+1] = mark
-    end
-    rows = [join(c, ' ') for c in eachrow(chars)]
-    join(rows, "\n")
-end
-
-function rgb_char(r, g, b, char)
-    "\e[1m\e[38;2;$r;$g;$b;249m$char\e[0m"
-end
-
-function viz_smolyak_2d(mset::MultiIndexing.MultiIndexSet)
-    smolyak_indices = MultiIndexing.smolyakIndexing(mset, true)
-    rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
-    mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
-    chars = fill(" ", (mset_max .+ 1)...)
-    for (j,level) in enumerate(smolyak_indices)
-        col = rgb1 * (j-1) + rgb2 * (length(smolyak_indices) - j)
-        for idx in level
-            m_idx = mset.indices[idx]
-            chars[(m_idx .+ 1)...] = rgb_char(col..., 'X')
-            back_indices = MultiIndexing.allBackwardAncestors(mset, idx)
-            for bidx in back_indices
-                m_idx_b = mset.indices[bidx]
-                chars[(m_idx_b .+1)...] = rgb_char(col..., 'o')
-            end
-        end
-    end
-    join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
-end
-
-
 @testset "MultiIndexing.jl" begin
     @testset "CreateTotalOrder" begin
         @testset "Basic Total Order" begin
@@ -110,7 +46,7 @@ end
 
             # Test Empty limiter Set creation
             empty_limiter = Returns(false)
-            @test_logs (:warn, "No valid reduced margin found on frontier") (mis = MultiIndexing.CreateTotalOrder(d, p, empty_limiter))
+            @test_logs (:warn, "No valid reduced margin found on frontier") (mis = CreateTotalOrder(d, p, empty_limiter))
             @test length(mis.indices) == 0 # Set is nonempty
             @test mis.isDownwardClosed # Set is not downward closed
             @test mis.limit == empty_limiter # Set has a limiter
@@ -134,12 +70,12 @@ end
 
     @testset "Backward Ancestors" begin
         d, p = 5, 10
-        mset = MultiIndexing.CreateTotalOrder(d, p)
+        mset = CreateTotalOrder(d, p)
         idx = SVector{d}(fill(p÷d,d))
         j = findfirst(isequal(idx), mset.indices)
         @test !isnothing(j) # Index must be in set
         @test mset[j] == idx # Index must be at j
-        ancestors = MultiIndexing.allBackwardAncestors(mset, j)
+        ancestors = allBackwardAncestors(mset, j)
         @test length(ancestors) == prod(idx .+ 1) - 1 # Must have d*p ancestors
         @test all(ancestors .< length(mset.indices)) # All ancestors must be in set
         @test all(all(mset[i] .<= idx) for i in ancestors) # All ancestors must be in tensor product box
@@ -152,7 +88,7 @@ end
     @testset "Reduced Frontier" begin
         rng, d, p = Xoshiro(820482), 5, 10
         mis = create_example_curved(rng, d, p)
-        frontier = MultiIndexing.findReducedFrontier(mis)
+        frontier = findReducedFrontier(mis)
         @test all(mis.limit(mis.indices[i], p) for i in frontier) # All frontier indices pass limiter
         @test all(frontier isa Vector{Int}) # Frontier is a vector of integers
         @test all(frontier .<= length(mis.indices)) # All frontier indices are in the set
@@ -161,7 +97,7 @@ end
         all_ancestors = Set{Int}(frontier)
         @test length(all_ancestors) == length(frontier) # All indices are unique
         for j in eachindex(mis.indices)
-            back_neighbors = MultiIndexing.allBackwardAncestors(mis, j)
+            back_neighbors = allBackwardAncestors(mis, j)
             if j in frontier
                 for b in back_neighbors
                     push!(all_ancestors, b)
