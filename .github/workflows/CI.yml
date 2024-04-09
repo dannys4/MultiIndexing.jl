@@ -43,3 +43,23 @@ jobs:
       - uses: codecov/codecov-action@v4
         with:
           files: lcov.info
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v2
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.9'
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-docdeploy@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          julia --project=docs -e '
+            using Documenter: DocMeta, doctest
+            using MultiIndexing
+            DocMeta.setdocmeta!(MultiIndexing, :DocTestSetup, :(using MultiIndexing); recursive=true)
+            doctest(MultiIndexing)'
