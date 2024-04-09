@@ -43,6 +43,10 @@ function Base.iterate(mis::MultiIndexSet{d}, state::Int = 1)::Union{Tuple{SVecto
     return state > length(mis.indices) ? nothing : (mis.indices[state], state+1)
 end
 
+function Base.vec(mis::MultiIndexSet{d}) where {d}
+    collect.(mis.indices)
+end
+
 # Creates a matrix of multi-indices of total order p
 # returns the matrix and the index where the frontier starts
 function CreateTotalOrder_matrix(d::Int, p::Int)
@@ -182,7 +186,7 @@ X X X X
 X X X X X
 X X X X X X
 
-julia> midx = @SVector[2,2]; idx = findfirst(isequal(midx), mis.indices);
+julia> midx = [2,2]; idx = findfirst(isequal(midx), vec(mis.indices));
 
 julia> ancestors_idx = allBackwardAncestors(mis, idx);
 
@@ -260,7 +264,7 @@ julia> length(frontier)
 
 julia> expected_indices = [[0,3], [1,2], [2,1], [3,0]];
 
-julia> all(SVector{d}(e) in mis for e in expected_indices)
+julia> all(e in vec(mis) for e in expected_indices)
 true
 
 ```
