@@ -20,6 +20,5 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/dannys4/MultiIndexing.jl",
-    devbranch="addDocs",
+    repo="github.com/dannys4/MultiIndexing.jl"
 )
