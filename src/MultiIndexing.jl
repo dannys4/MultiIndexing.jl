@@ -3,8 +3,10 @@ module MultiIndexing
 using StaticArrays, LinearAlgebra
 import Base: getindex, push!, length, iterate
 
-# Represents a set of multi-indices
-# N x dim matrix (dim is dimension of multi-indices, N is number)
+"""
+Represents a set of multi-indices
+vector of {d} dimensional multi-indices with length N
+"""
 struct MultiIndexSet{d,T}
     indices::Vector{SVector{d,Int}}
     reduced_margin::Vector{StaticVector{d,Int}}
@@ -22,15 +24,22 @@ function MultiIndexSet(indices::Vector{SVector{d,Int}}, limit::T=NoLimiter, calc
     MultiIndexSet{d,T}(indices, reduced_margin, limit, true, maxDegrees)
 end
 
-# indices: dim x N matrix of multi-indices
-# limit: function that takes a multi-index and a limit and returns true if the index is admissible
-# calc_reduced_margin: if true, calculate the reduced margin of the set, otherwise leave it empty
+"""
+Create a multi-index set from a matrix of multi-indices
+
+    MultiIndexSet(indices, limit, calc_reduced_margin)
+
+- indices: dim x N matrix of multi-indices
+- limit: function that takes a multi-index and a limit and returns true if the index is admissible
+- calc_reduced_margin: if true, calculate the reduced margin of the set, otherwise leave it empty
+"""
 function MultiIndexSet(indices_mat::Matrix{Int}, limit::T=NoLimiter, calc_reduced_margin=false) where {T}
     d = size(indices_mat,1)
     indices = [SVector{d}(indices_mat[:,i]) for i in axes(indices_mat,2)]
     MultiIndexSet(indices, limit, calc_reduced_margin)
 end
 
+# Some helper functions
 function Base.getindex(mis::MultiIndexSet{d}, i) where {d}
     mis.indices[i]
 end
@@ -46,6 +55,7 @@ end
 function Base.vec(mis::MultiIndexSet{d}) where {d}
     collect.(mis.indices)
 end
+
 
 # Creates a matrix of multi-indices of total order p
 # returns the matrix and the index where the frontier starts
@@ -92,6 +102,11 @@ function (lim::CurvedLimiter{d})(index::StaticVector{d}, p) where {d}
     lim.limit(index + lim.curve_weights .* log1p.(index), p)
 end
 
+"""
+Create a multi-index set with total order p
+
+    CreateTotalOrder(d, p, limit)
+"""
 function CreateTotalOrder(d::Int, p, limit=NoLimiter)
     mset_mat, last_start = CreateTotalOrder_matrix(d, ceil(p))
     frontier = @view mset_mat[:, last_start:end]
@@ -125,6 +140,11 @@ function tens_prod_mat(p,d)
     tens_prod_mat(fill(p,d))
 end
 
+"""
+Create a multi-index set with tensor order p
+
+    CreateTensorOrder(d, p, limit)
+"""
 function CreateTensorOrder(d::Int, p::Int, limit::T=NoLimiter) where {T}
     indices_arr = CartesianIndices(ntuple(_->0:p, d))
     indices = [SVector(Tuple(idx)) for idx in vec(indices_arr) if limit(SVector(Tuple(idx)), p)]
@@ -142,7 +162,11 @@ function in_mset_backward(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where
     false
 end
 
-# Check if an index is admissible to add to a reduced margin
+"""
+Check if an index is admissible to add to a reduced margin
+
+    checkIndexAdmissible(mis, idx, check_indices)
+"""
 function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}, check_indices::Bool = false) where {d}
     # If any index is greater than the limit, return false
     mis.limit(idx) && return false
@@ -173,7 +197,7 @@ Arguments:
 - mis: MultiIndexSet to get the backward ancestors from
 - j: index of the multi-index to get the backward ancestors of
 
-```
+```jldoctest
 julia> d, p = 2, 5;
 
 julia> mis = CreateTotalOrder(d, p);
@@ -307,7 +331,7 @@ X X X X X
 
 """
 function visualize_2d(mset, markers = 'X')
-    if mset isa MultiIndexing.MultiIndexSet
+    if mset isa MultiIndexSet
         mset = reduce(hcat, mset.indices)
     end
     @assert size(mset, 1) == 2 "Only 2D visualization supported"
@@ -340,8 +364,8 @@ X X
 X X o o X
 
 """
-function visualize_smolyak_2d(mset::MultiIndexing.MultiIndexSet)
-    smolyak_indices = MultiIndexing.smolyakIndexing(mset, true)
+function visualize_smolyak_2d(mset::MultiIndexSet)
+    smolyak_indices = smolyakIndexing(mset, true)
     rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
     mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
     chars = fill(" ", (mset_max .+ 1)...)
@@ -350,7 +374,7 @@ function visualize_smolyak_2d(mset::MultiIndexing.MultiIndexSet)
         for idx in level
             m_idx = mset.indices[idx]
             chars[(m_idx .+ 1)...] = rgb_char(col..., 'X')
-            back_indices = MultiIndexing.allBackwardAncestors(mset, idx)
+            back_indices = allBackwardAncestors(mset, idx)
             for bidx in back_indices
                 m_idx_b = mset.indices[bidx]
                 chars[(m_idx_b .+1)...] = rgb_char(col..., 'o')
@@ -380,13 +404,6 @@ X
 X X
 X X X X X
 
-julia println(visualize_smolyak_2d(mis)) # Note coloring in CLI
-X
-o
-o
-X X
-X X o o X
-
 julia> level_indices = smolyakIndexing(mis, true);
 
 julia> level_sets = [MultiIndexSet(mis[li]) for li in level_indices];
@@ -404,7 +421,6 @@ X
 
 julia> println(visualize_2d(level_sets[3]))
 X
-
 ```
 """
 function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where {d,T}
@@ -433,14 +449,16 @@ function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where
     frontiers
 end
 
+# Create a two-dimensional multi-index set with a hyperbolic limiter
 function create_example_hyperbolic2d(p)
     log2p = floor(Int, log2(p))
     pd2 = p ÷ 2
-    midx_rep = reduce(hcat, [MultiIndexing.tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:log2p-1)])
+    midx_rep = reduce(hcat, [tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:log2p-1)])
     midx_ext = Int[midx_rep [pd2+1:p zeros(pd2)]' [zeros(pd2) pd2+1:p]']
-    MultiIndexing.MultiIndexSet(unique(midx_ext, dims=2))
+    MultiIndexSet(unique(midx_ext, dims=2))
 end
 
+# Create a three-dimensional multi-index set with a hyperbolic limiter
 function create_example_hyperbolic3d(p)
     log2p = floor(Int, log2(p))
     pd2 = p ÷ 2
@@ -450,12 +468,12 @@ function create_example_hyperbolic3d(p)
             p_1 = 2^logp_1
             p_2 = 2^logp_2
             p_3 = 2^(log2p - (logp_1 + logp_2 + 1))
-            push!(mset_rep, MultiIndexing.tens_prod_mat(@SVector[p_1, p_2, p_3]))
+            push!(mset_rep, tens_prod_mat(@SVector[p_1, p_2, p_3]))
         end
     end
     mset_rep = reduce(hcat, mset_rep)
     mset_ext = Int[mset_rep [pd2+1:p zeros(pd2) zeros(pd2)]' [zeros(pd2) pd2+1:p zeros(pd2)]' [zeros(pd2) zeros(pd2) pd2+1:p]']
-    MultiIndexing.MultiIndexSet(unique(mset_ext, dims=2))
+    MultiIndexSet(unique(mset_ext, dims=2))
 end
 
 export CreateTensorOrder, CreateTotalOrder, MultiIndexSet
