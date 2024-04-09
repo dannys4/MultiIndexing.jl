@@ -175,11 +175,11 @@ julia> d, p = 2, 5;
 julia> mis = CreateTotalOrder(d, p);
 
 julia> println(visualize_2d(mis))
-X          
-X X        
-X X X      
-X X X X    
-X X X X X  
+X
+X X
+X X X
+X X X X
+X X X X X
 X X X X X X
 
 julia> midx = @SVector[2,2]; idx = findfirst(isequal(midx), mis.indices);
@@ -189,7 +189,7 @@ julia> ancestors_idx = allBackwardAncestors(mis, idx);
 julia> ancestors = MultiIndexSet(mis[ancestors_idx]);
 
 julia> println(visualize_2d(ancestors))
-X X  
+X X
 X X X
 X X X
 
@@ -295,10 +295,10 @@ Arguments:
 julia> mis = CreateTotalOrder(2, 4);
 
 julia> println(visualize_2d(mis))
-X        
-X X      
-X X X    
-X X X X  
+X
+X X
+X X X
+X X X X
 X X X X X
 
 """
@@ -322,17 +322,17 @@ end
 
 """
 Visualize a two-dimensional mset's smolyak decomposition with colors!
-    
+
         visualize_smolyak_2d(mset)
 
 ```jldoctest
 julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
 
 julia> println(visualize_smolyak_2d(mis)) # Note colors on [4,0], [1,1] and [0,4] match
-X        
-o        
-o        
-X X      
+X
+o
+o
+X X
 X X o o X
 
 """
@@ -370,17 +370,17 @@ where we subtract every index in level j if even and add if j is odd. If false, 
 julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
 
 julia> println(visualize_2d(mis))
-X        
-X        
-X        
-X X      
+X
+X
+X
+X X
 X X X X X
 
 julia println(visualize_smolyak_2d(mis)) # Note coloring in CLI
-X        
-o        
-o        
-X X      
+X
+o
+o
+X X
 X X o o X
 
 julia> level_indices = smolyakIndexing(mis, true);
@@ -388,14 +388,14 @@ julia> level_indices = smolyakIndexing(mis, true);
 julia> level_sets = [MultiIndexSet(mis[li]) for li in level_indices];
 
 julia> println(visualize_2d(level_sets[1]))
-X        
-         
-         
-  X      
+X
+
+
+  X
         X
 
 julia> println(visualize_2d(level_sets[2]))
-X  
+X
   X
 
 julia> println(visualize_2d(level_sets[3]))
