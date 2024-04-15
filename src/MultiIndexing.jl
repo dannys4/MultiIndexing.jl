@@ -388,70 +388,43 @@ function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool=true)
 end
 
 """
-    smolyakIndexing(mis, keep_levels)
+    smolyakIndexing(mis)
 
 Gets the smolyak indexing for a multi-index set. Each index represents a tensor-product box.
 
-# Arguments
-- `mis`: MultiIndexSet to get the Smolyak indexing for
-- `keep_levels`: if true, return index vectors at each level of the Smolyak grid,
-where we subtract every index in level j if even and add if j is odd.
-If false, return the positive and negative pairs
+TODO: Add more documentation
 
-# Examples
-```jldoctest
-julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
-
-julia> println(visualize_2d(mis))
-X
-X
-X
-X X
-X X X X X
-
-julia> level_indices = smolyakIndexing(mis, true);
-
-julia> level_sets = [MultiIndexSet(mis[li]) for li in level_indices];
-
-julia> println(visualize_2d(level_sets[1]))
-X
-
-
-  X
-        X
-
-julia> println(visualize_2d(level_sets[2]))
-X
-  X
-
-julia> println(visualize_2d(level_sets[3]))
-X
 ```
 """
-function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where {d,T}
-    mi_loop = mis
-    frontiers = keep_levels ? Vector{Int}[] : ntuple(_->Int[], 2)
-    original_indices = collect(1:length(mis.indices))
-    frontiers_index = 1
-    while length(mi_loop.indices) > 0
-        frontier = findReducedFrontier(mi_loop)
-        occurrences = zeros(Int, length(mi_loop.indices))
-        for idx in frontier
-            back_idxs = allBackwardAncestors(mi_loop, idx)
-            occurrences[back_idxs] .+= 1
+function smolyakIndexing(mset_full::MultiIndexSet{d,T}) where {d,T}
+    N = length(mset_full)
+    quad_rules = []
+    occurrences = zeros(Int, N)
+    loop_indices = collect(1:N)
+    while sum(loop_indices) > 0
+        # Form the mset for this loop
+        loop_indices_full_map = (1:N)[loop_indices]
+        mset_loop = MultiIndexSet{d,T}(mset_full.indices[loop_indices], [], mset_full.limit, true, mset_full.maxDegrees)
+        frontier_loop = findReducedFrontier(mset_loop)
+
+        # Adjust each frontier member and reindex their ancestors' number of occurrences
+        for idx_midx_loop in frontier_loop
+            # Access the adjustment for this frontier member
+            idx_midx_full = loop_indices_full_map[idx_midx_loop]
+            j = 1-occurrences[idx_midx_full] # Enforce o[i] + j = 1
+            occurrences[idx_midx_full] = 1
+
+            # Reindex the number of occurrences of the backward ancestors
+            ancestors = allBackwardAncestors(mset_loop, idx_midx_loop)
+            for idx_back_loop in ancestors
+                idx_back_full = loop_indices_full_map[idx_back_loop]
+                occurrences[idx_back_full] += j
+            end
+            push!(quad_rules, (mset_full[idx_midx_full], j))
         end
-        sort!(frontier)
-        if keep_levels
-            push!(frontiers, original_indices[frontier])
-        else
-            append!(frontiers[frontiers_index], original_indices[frontier])
-        end
-        repeated_indices = mi_loop.indices[occurrences .> 1]
-        original_indices = original_indices[occurrences .> 1]
-        mi_loop = MultiIndexSet{d,T}(repeated_indices, [], mis.limit, true, mis.maxDegrees)
-        frontiers_index = 3-frontiers_index # map 2 to 1 and 1 to 2
+        loop_indices = occurrences .!= 1
     end
-    frontiers
+    return quad_rules
 end
 
 # Create a two-dimensional multi-index set with a hyperbolic limiter
