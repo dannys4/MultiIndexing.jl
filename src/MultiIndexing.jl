@@ -57,7 +57,6 @@ function Base.vec(mis::MultiIndexSet{d}) where {d}
     collect.(mis.indices)
 end
 
-
 # Creates a matrix of multi-indices of total order p
 # returns the matrix and the index where the frontier starts
 function CreateTotalOrder_matrix(d::Int, p::Int)
@@ -364,94 +363,94 @@ X
 o
 o
 X X
-X X o o X
+o X o o X
 ```
 """
 function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool=true)
-    smolyak_indices = smolyakIndexing(mset, true)
+    smolyak_rules = smolyakIndexing(mset)
+    min_count, max_count = extrema(j[2] for j in smolyak_rules)
     rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
     mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
     chars = fill(" ", (mset_max .+ 1)...)
-    for (j,level) in enumerate(smolyak_indices)
-        col = rgb1 * (j-1) + rgb2 * (length(smolyak_indices) - j)
-        for idx in level
-            m_idx = mset.indices[idx]
-            chars[(m_idx .+ 1)...] = rgb_char(col..., 'X', colored)
-            back_indices = allBackwardAncestors(mset, idx)
-            for bidx in back_indices
-                m_idx_b = mset.indices[bidx]
-                chars[(m_idx_b .+1)...] = rgb_char(col..., 'o', colored)
-            end
+    for (idx,j) in smolyak_rules
+        interp_idx = (j-min_count)/(max_count - min_count)
+        col = round.(Int, rgb1 * (1-interp_idx) + rgb2 * interp_idx)
+        m_idx = mset.indices[idx]
+        chars[(m_idx .+ 1)...] = rgb_char(col..., 'X', colored)
+        back_indices = allBackwardAncestors(mset, idx)
+        for bidx in back_indices
+            m_idx_b = mset.indices[bidx]
+            chars[(m_idx_b .+1)...] = rgb_char(col..., 'o', colored)
         end
     end
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
 end
 
 """
-    smolyakIndexing(mis, keep_levels)
+    smolyakIndexing(mset) -> Vector{Tuple{Int,Int}}
 
-Gets the smolyak indexing for a multi-index set. Each index represents a tensor-product box.
-
-# Arguments
-- `mis`: MultiIndexSet to get the Smolyak indexing for
-- `keep_levels`: if true, return index vectors at each level of the Smolyak grid,
-where we subtract every index in level j if even and add if j is odd.
-If false, return the positive and negative pairs
+Gets the smolyak indexing for a multi-index set.
+Returns a vector of tuples with each first index as the index
+of the multi-index representing a tensor product rule and each
+second index representing its count in the smolyak construction.
 
 # Examples
 ```jldoctest
-julia> mis = MultiIndexSet([0 1 4 3 2 1 0 0 0 0; 0 1 0 0 0 0 1 2 3 4]);
+julia> d = 2;
 
-julia> println(visualize_2d(mis))
-X
-X
+julia> mis = MultiIndexSet([(0:7)'; zeros(Int,1,8)]);
+
+julia> quad_rules = smolyakIndexing(mis); # Creates quad rule exact on x^7
+
+julia> quad_rules[1], length(quad_rules) # Counts the highest index once
+((8, 1), 1)
+
+julia> mis = CreateTotalOrder(d, 10);
+
+julia> print(visualize_smolyak_2d(mis, false))
 X
 X X
-X X X X X
-
-julia> level_indices = smolyakIndexing(mis, true);
-
-julia> level_sets = [MultiIndexSet(mis[li]) for li in level_indices];
-
-julia> println(visualize_2d(level_sets[1]))
-X
-
-
-  X
-        X
-
-julia> println(visualize_2d(level_sets[2]))
-X
-  X
-
-julia> println(visualize_2d(level_sets[3]))
-X
+o X X
+o o X X
+o o o X X
+o o o o X X
+o o o o o X X
+o o o o o o X X
+o o o o o o o X X
+o o o o o o o o X X
+o o o o o o o o o X X
 ```
 """
-function smolyakIndexing(mis::MultiIndexSet{d,T}, keep_levels::Bool=false) where {d,T}
-    mi_loop = mis
-    frontiers = keep_levels ? Vector{Int}[] : ntuple(_->Int[], 2)
-    original_indices = collect(1:length(mis.indices))
-    frontiers_index = 1
-    while length(mi_loop.indices) > 0
-        frontier = findReducedFrontier(mi_loop)
-        occurrences = zeros(Int, length(mi_loop.indices))
-        for idx in frontier
-            back_idxs = allBackwardAncestors(mi_loop, idx)
-            occurrences[back_idxs] .+= 1
+function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
+    mset_full = mset # Alias to clarify in code what's going on
+    N = length(mset_full)
+    quad_rules = []
+    occurrences = zeros(Int, N)
+    loop_indices = collect(1:N)
+    while sum(loop_indices) > 0
+        # Form the mset for this loop
+        loop_indices_full_map = (1:N)[loop_indices]
+        mset_loop = MultiIndexSet{d,T}(mset_full.indices[loop_indices], [], mset_full.limit, true, mset_full.maxDegrees)
+        frontier_loop = findReducedFrontier(mset_loop)
+
+        # Adjust each frontier member and reindex their ancestors' number of occurrences
+        for idx_midx_loop in frontier_loop
+            # Access the adjustment for this frontier member
+            idx_midx_full = loop_indices_full_map[idx_midx_loop]
+            j = 1-occurrences[idx_midx_full] # Enforce o[i] + j = 1
+            occurrences[idx_midx_full] = 1
+
+            # Reindex the number of occurrences of the backward ancestors
+            ancestors = allBackwardAncestors(mset_loop, idx_midx_loop)
+            for idx_back_loop in ancestors
+                idx_back_full = loop_indices_full_map[idx_back_loop]
+                occurrences[idx_back_full] += j
+            end
+            push!(quad_rules, (idx_midx_full, j))
         end
-        sort!(frontier)
-        if keep_levels
-            push!(frontiers, original_indices[frontier])
-        else
-            append!(frontiers[frontiers_index], original_indices[frontier])
-        end
-        repeated_indices = mi_loop.indices[occurrences .> 1]
-        original_indices = original_indices[occurrences .> 1]
-        mi_loop = MultiIndexSet{d,T}(repeated_indices, [], mis.limit, true, mis.maxDegrees)
-        frontiers_index = 3-frontiers_index # map 2 to 1 and 1 to 2
+        loop_indices = occurrences .!= 1
     end
-    frontiers
+    return quad_rules
 end
 
 # Create a two-dimensional multi-index set with a hyperbolic limiter
