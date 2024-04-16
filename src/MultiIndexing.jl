@@ -57,7 +57,6 @@ function Base.vec(mis::MultiIndexSet{d}) where {d}
     collect.(mis.indices)
 end
 
-
 # Creates a matrix of multi-indices of total order p
 # returns the matrix and the index where the frontier starts
 function CreateTotalOrder_matrix(d::Int, p::Int)
@@ -364,39 +363,66 @@ X
 o
 o
 X X
-X X o o X
+o X o o X
 ```
 """
 function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool=true)
-    smolyak_indices = smolyakIndexing(mset, true)
+    smolyak_rules = smolyakIndexing(mset)
+    min_count, max_count = extrema(j[2] for j in smolyak_rules)
     rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
     mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
     chars = fill(" ", (mset_max .+ 1)...)
-    for (j,level) in enumerate(smolyak_indices)
-        col = rgb1 * (j-1) + rgb2 * (length(smolyak_indices) - j)
-        for idx in level
-            m_idx = mset.indices[idx]
-            chars[(m_idx .+ 1)...] = rgb_char(col..., 'X', colored)
-            back_indices = allBackwardAncestors(mset, idx)
-            for bidx in back_indices
-                m_idx_b = mset.indices[bidx]
-                chars[(m_idx_b .+1)...] = rgb_char(col..., 'o', colored)
-            end
+    for (idx,j) in smolyak_rules
+        interp_idx = (j-min_count)/(max_count - min_count)
+        col = round.(Int, rgb1 * (1-interp_idx) + rgb2 * interp_idx)
+        m_idx = mset.indices[idx]
+        chars[(m_idx .+ 1)...] = rgb_char(col..., 'X', colored)
+        back_indices = allBackwardAncestors(mset, idx)
+        for bidx in back_indices
+            m_idx_b = mset.indices[bidx]
+            chars[(m_idx_b .+1)...] = rgb_char(col..., 'o', colored)
         end
     end
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
 end
 
 """
-    smolyakIndexing(mis)
+    smolyakIndexing(mset) -> Vector{Tuple{Int,Int}}
 
-Gets the smolyak indexing for a multi-index set. Each index represents a tensor-product box.
+Gets the smolyak indexing for a multi-index set.
+Returns a vector of tuples with each first index as the index
+of the multi-index representing a tensor product rule and each
+second index representing its count in the smolyak construction.
 
-TODO: Add more documentation
+# Examples
+```jldoctest
+julia> d = 2;
 
+julia> mis = MultiIndexSet([(0:7)'; zeros(Int,1,8)]);
+
+julia> quad_rules = smolyakIndexing(mis); # Creates quad rule exact on x^7
+
+julia> quad_rules[1], length(quad_rules) # Counts the highest index once
+((8, 1), 1)
+
+julia> mis = CreateTotalOrder(d, 10);
+
+julia> print(visualize_smolyak_2d(mis, false))
+X
+X X
+o X X
+o o X X
+o o o X X
+o o o o X X
+o o o o o X X
+o o o o o o X X
+o o o o o o o X X
+o o o o o o o o X X
+o o o o o o o o o X X
 ```
 """
-function smolyakIndexing(mset_full::MultiIndexSet{d,T}) where {d,T}
+function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
+    mset_full = mset # Alias to clarify in code what's going on
     N = length(mset_full)
     quad_rules = []
     occurrences = zeros(Int, N)
@@ -420,7 +446,7 @@ function smolyakIndexing(mset_full::MultiIndexSet{d,T}) where {d,T}
                 idx_back_full = loop_indices_full_map[idx_back_loop]
                 occurrences[idx_back_full] += j
             end
-            push!(quad_rules, (mset_full[idx_midx_full], j))
+            push!(quad_rules, (idx_midx_full, j))
         end
         loop_indices = occurrences .!= 1
     end
