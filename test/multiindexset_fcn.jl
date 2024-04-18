@@ -11,7 +11,7 @@
     mset_4_mat = vcat(mset_3_mat', Int[zeros(6) 1:6])'
     mset_4 = MultiIndexSet(mset_4_mat)
     @test isDownwardClosed(mset_4)
-    mset_5_mat = hcat(mset_3_mat, Int[3,3])'
+    mset_5_mat = hcat(mset_3_mat, Int[3, 3])'
     mset_5 = MultiIndexSet(mset_5_mat)
     @test !isDownwardClosed(mset_5)
 end
@@ -19,7 +19,7 @@ end
 @testset "Backward Ancestors" begin
     d, p = 5, 10
     mset = CreateTotalOrder(d, p)
-    idx = SVector{d}(fill(p÷d,d))
+    idx = SVector{d}(fill(p ÷ d, d))
     j = findfirst(isequal(idx), mset.indices)
     @test !isnothing(j) # Index must be in set
     @test mset[j] == idx # Index must be at j
@@ -62,7 +62,7 @@ end
 
 @testset "Subset Completion" begin
     mset = CreateTotalOrder(5, 10)
-    subset = 1:(length(mset)÷5):length(mset)
+    subset = 1:(length(mset) ÷ 5):length(mset)
     mset2 = MultiIndexSet(mset[subset])
     completion_indices = MultiIndexing.subsetCompletion(mset, subset)
     completion = MultiIndexSet(mset[completion_indices], mset.limit)

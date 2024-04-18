@@ -18,6 +18,7 @@ end
     @testset "MultiIndexSet Creation" begin
         include("multiindexset_construct.jl")
     end
+
     @testset "MultiIndexSet Methods" begin
         include("multiindexset_fcn.jl")
     end

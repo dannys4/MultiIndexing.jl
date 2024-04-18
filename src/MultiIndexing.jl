@@ -7,21 +7,22 @@ import Base: getindex, push!, length, iterate
 Represents a set of multi-indices
 vector of {d} dimensional multi-indices with length N
 """
-struct MultiIndexSet{d,T}
-    indices::Vector{SVector{d,Int}}
-    reduced_margin::Vector{StaticVector{d,Int}}
+struct MultiIndexSet{d, T}
+    indices::Vector{SVector{d, Int}}
+    reduced_margin::Vector{StaticVector{d, Int}}
     limit::T
     isDownwardClosed::Bool
-    maxDegrees::MVector{d,Int}
+    maxDegrees::MVector{d, Int}
 end
 
-function MultiIndexSet(indices::Vector{SVector{d,Int}}, limit::T=NoLimiter, calc_reduced_margin=false) where {d,T}
+function MultiIndexSet(indices::Vector{SVector{d, Int}}, limit::T = NoLimiter,
+        calc_reduced_margin = false) where {d, T}
     reduced_margin = []
     if calc_reduced_margin
         throw(ArgumentError("Reduced margin calculation not implemented"))
     end
-    maxDegrees = MVector{d}(reduce((x,y)->max.(x,y), indices, init=zeros(Int, d)))
-    MultiIndexSet{d,T}(indices, reduced_margin, limit, true, maxDegrees)
+    maxDegrees = MVector{d}(reduce((x, y) -> max.(x, y), indices, init = zeros(Int, d)))
+    MultiIndexSet{d, T}(indices, reduced_margin, limit, true, maxDegrees)
 end
 
 """
@@ -34,9 +35,10 @@ Arguments:
 - `limit`: function that takes a multi-index and a limit and returns true if the index is admissible
 - `calc_reduced_margin`: if true, calculate the reduced margin of the set, otherwise leave it empty
 """
-function MultiIndexSet(indices_mat::AbstractMatrix{Int}, limit::T=NoLimiter, calc_reduced_margin=false) where {T}
-    d = size(indices_mat,1)
-    indices = [SVector{d}(indices_mat[:,i]) for i in axes(indices_mat,2)]
+function MultiIndexSet(indices_mat::AbstractMatrix{Int}, limit::T = NoLimiter,
+        calc_reduced_margin = false) where {T}
+    d = size(indices_mat, 1)
+    indices = [SVector{d}(indices_mat[:, i]) for i in axes(indices_mat, 2)]
     MultiIndexSet(indices, limit, calc_reduced_margin)
 end
 
@@ -49,8 +51,9 @@ function Base.length(mis::MultiIndexSet{d}) where {d}
     length(mis.indices)
 end
 
-function Base.iterate(mis::MultiIndexSet{d}, state::Int = 1)::Union{Tuple{SVector{d,Int},Int},Nothing} where {d}
-    return state > length(mis.indices) ? nothing : (mis.indices[state], state+1)
+function Base.iterate(mis::MultiIndexSet{d},
+        state::Int = 1)::Union{Tuple{SVector{d, Int}, Int}, Nothing} where {d}
+    return state > length(mis.indices) ? nothing : (mis.indices[state], state + 1)
 end
 
 function Base.vec(mis::MultiIndexSet{d}) where {d}
@@ -65,23 +68,24 @@ function CreateTotalOrder_matrix(d::Int, p::Int)
     last_start = -1
     for j in 1:p
         Mk = repeat(Mk, 1, d) + kron(I(d), ones(Int, 1, size(Mk, 2)))
-        Mk = unique(Mk, dims=2)
+        Mk = unique(Mk, dims = 2)
         M = hcat(M, Mk)
-        j == p-1 && (last_start = size(M, 2)+1)
+        j == p - 1 && (last_start = size(M, 2) + 1)
     end
     M, last_start
 end
 
 NoLimiter = Returns(true)
 
-SumLimiter = (x::StaticVector,p) -> sum(x) <= p
+SumLimiter = (x::StaticVector, p) -> sum(x) <= p
 
-struct AnisotropicLimiter{d,T}
-    weights::StaticVector{d,Float64}
+struct AnisotropicLimiter{d, T}
+    weights::StaticVector{d, Float64}
     limit::T
-    function AnisotropicLimiter(weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
+    function AnisotropicLimiter(
+            weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
         _d = length(weights)
-        new{_d,_T}(SVector{_d}(weights), limit)
+        new{_d, _T}(SVector{_d}(weights), limit)
     end
 end
 
@@ -89,12 +93,13 @@ function (lim::AnisotropicLimiter{d})(index::StaticVector{d}, p) where {d}
     lim.limit(index .* lim.weights, p)
 end
 
-struct CurvedLimiter{d,T}
-    curve_weights::StaticVector{d,Float64}
+struct CurvedLimiter{d, T}
+    curve_weights::StaticVector{d, Float64}
     limit::T
-    function CurvedLimiter(curve_weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
+    function CurvedLimiter(
+            curve_weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
         _d = length(curve_weights)
-        new{_d,_T}(SVector{_d}(curve_weights), limit)
+        new{_d, _T}(SVector{_d}(curve_weights), limit)
     end
 end
 
@@ -107,37 +112,40 @@ end
 
 Create a multi-index set with total order p
 """
-function CreateTotalOrder(d::Int, p, limit=NoLimiter)
+function CreateTotalOrder(d::Int, p, limit = NoLimiter)
     mset_mat, last_start = CreateTotalOrder_matrix(d, ceil(p))
     frontier = @view mset_mat[:, last_start:end]
-    indices = [SVector{d}(mset_mat[:,i]) for i in axes(mset_mat,2) if limit(SVector{d}(mset_mat[:,i]), p)]
-    reduced_margin = Vector{StaticVector{d,Int}}(undef, size(frontier, 2)*d)
+    indices = [SVector{d}(mset_mat[:, i])
+               for i in axes(mset_mat, 2) if limit(SVector{d}(mset_mat[:, i]), p)]
+    reduced_margin = Vector{StaticVector{d, Int}}(undef, size(frontier, 2) * d)
     rm_idx = 1
     max_degrees = zeros(Int, d)
     full_limited = true
     @inbounds for i in axes(frontier, 2)
-        m_idx = frontier[:,i]
+        m_idx = frontier[:, i]
         limit(SVector{d}(m_idx), p) && for j in 1:d
             max_degrees[j] = max(max_degrees[j], m_idx[j])
             m_idx[j] += 1
             static_m_idx = SVector{d}(m_idx)
-            if limit(static_m_idx, p+1)
+            if limit(static_m_idx, p + 1)
                 reduced_margin[rm_idx] = static_m_idx
                 rm_idx += 1
             end
             m_idx[j] -= 1
-            full_limited &= false;
+            full_limited &= false
         end
     end
     full_limited && @warn "No valid reduced margin found on frontier"
-    MultiIndexSet{d,typeof(limit)}(indices, unique(reduced_margin[1:rm_idx-1]), limit, true, SVector{d}(max_degrees))
+    MultiIndexSet{d, typeof(limit)}(indices, unique(reduced_margin[1:(rm_idx - 1)]),
+        limit, true, SVector{d}(max_degrees))
 end
 
 function tens_prod_mat(idx)
-    reduce(hcat, collect.(Tuple.(vec(CartesianIndices(ntuple(k->0:idx[k], length(idx)))))))
+    reduce(
+        hcat, collect.(Tuple.(vec(CartesianIndices(ntuple(k -> 0:idx[k], length(idx)))))))
 end
-function tens_prod_mat(p,d)
-    tens_prod_mat(fill(p,d))
+function tens_prod_mat(p, d)
+    tens_prod_mat(fill(p, d))
 end
 
 """
@@ -145,16 +153,19 @@ end
 
 Create a multi-index set with tensor order p
 """
-function CreateTensorOrder(d::Int, p::Int, limit::T=NoLimiter) where {T}
-    indices_arr = CartesianIndices(ntuple(_->0:p, d))
-    indices = [SVector(Tuple(idx)) for idx in vec(indices_arr) if limit(SVector(Tuple(idx)), p)]
-    reduced_margin_arr = CartesianIndices(ntuple(_->0:p+1, d))
-    reduced_margin = [SVector(Tuple(idx)) for idx in vec(reduced_margin_arr) if any(idx .> p) && limit(SVector(Tuple(idx)), p+1)]
-    MultiIndexSet{d,T}(indices, reduced_margin, limit, true, SVector{d}(fill(p,d)))
+function CreateTensorOrder(d::Int, p::Int, limit::T = NoLimiter) where {T}
+    indices_arr = CartesianIndices(ntuple(_ -> 0:p, d))
+    indices = [SVector(Tuple(idx))
+               for idx in vec(indices_arr) if limit(SVector(Tuple(idx)), p)]
+    reduced_margin_arr = CartesianIndices(ntuple(_ -> 0:(p + 1), d))
+    reduced_margin = [SVector(Tuple(idx))
+                      for idx in vec(reduced_margin_arr)
+                      if any(idx .> p) && limit(SVector(Tuple(idx)), p + 1)]
+    MultiIndexSet{d, T}(indices, reduced_margin, limit, true, SVector{d}(fill(p, d)))
 end
 
 # Searches backward through the mset backward for an index
-function in_mset_backward(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
+function in_mset_backward(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
     any(idx .> mis.maxDegrees) && return false
     for i in length(mis.indices):-1:1
         mis.indices[i] == idx && return true
@@ -167,7 +178,8 @@ end
 
 Check if an index is admissible to add to a reduced margin
 """
-function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}, check_indices::Bool = false) where {d}
+function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d, Int},
+        check_indices::Bool = false) where {d}
     # If any index is greater than the limit, return false
     mis.limit(idx) && return false
     # If more than one subindex is greater than its max degree, return false
@@ -240,7 +252,7 @@ X X X
 """
 function allBackwardAncestors(mis::MultiIndexSet{d}, j::Int) where {d}
     idx = mis.indices[j]
-    back_indices = CartesianIndices(ntuple(k->0:idx[k], d))
+    back_indices = CartesianIndices(ntuple(k -> 0:idx[k], d))
     j_ancestors = Vector{Int}(undef, length(back_indices) - 1)
     for (i, back_index) in enumerate(back_indices)
         if i < length(back_indices)
@@ -256,12 +268,12 @@ function allBackwardAncestors(mis::MultiIndexSet{d}, j::Int) where {d}
 end
 
 # Update the max degrees of a set after adding an index
-function updateMaxDegrees!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
+function updateMaxDegrees!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
     mis.maxDegrees .= max.(mis.maxDegrees, idx)
 end
 
 # Update the reduced margin of a set after adding an index
-function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
+function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
     j = findfirst(isequal(idx), mis.reduced_margin)
     # delete idx from reduced margin
     deleteat!(mis.reduced_margin, j)
@@ -277,7 +289,7 @@ function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) w
     end
 end
 
-function Base.push!(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}) where {d}
+function Base.push!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
     (idx in mis.indices) && return true
     isValid = checkIndexValid(mis, idx)
     mis.isDownwardClosed = isValid
@@ -315,7 +327,7 @@ true
 function findReducedFrontier(mis::MultiIndexSet{d}) where {d}
     frontier = Int[]
     unmarked = ones(Bool, length(mis.indices))
-    sorted_idxs = sortperm(mis.indices, lt=(x,y)->sum(x) < sum(y))
+    sorted_idxs = sortperm(mis.indices, lt = (x, y) -> sum(x) < sum(y))
     inv_sorted_idxs = invperm(sorted_idxs)
     while true
         last_unmarked = findlast(unmarked)
@@ -354,11 +366,11 @@ function visualize_2d(mset, markers = 'X')
     if mset isa MultiIndexSet
         mset = reduce(hcat, mset.indices)
     end
-    @assert size(mset, 1) == 2 "Only 2D visualization supported"
-    chars = fill(' ', (maximum(mset,dims=2) .+ 1)...)
-    for j in axes(mset,2)
+    @assert size(mset, 1)==2 "Only 2D visualization supported"
+    chars = fill(' ', (maximum(mset, dims = 2) .+ 1)...)
+    for j in axes(mset, 2)
         mark = markers isa Char ? markers : markers[j]
-        chars[end - mset[1,j], mset[2,j]+1] = mark
+        chars[end - mset[1, j], mset[2, j] + 1] = mark
     end
     rows = [join(c, ' ') for c in eachrow(chars)]
     join(rows, "\n")
@@ -385,21 +397,21 @@ X X
 o X o o X
 ```
 """
-function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool=true)
+function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool = true)
     smolyak_rules = smolyakIndexing(mset)
     min_count, max_count = extrema(j[2] for j in smolyak_rules)
     rgb1, rgb2 = [100, 100, 0], [0, 100, 100]
     mset_max = [maximum(j[1] for j in mset.indices), maximum(j[2] for j in mset.indices)]
     chars = fill(" ", (mset_max .+ 1)...)
-    for (idx,j) in smolyak_rules
-        interp_idx = (j-min_count)/(max_count - min_count)
-        col = round.(Int, rgb1 * (1-interp_idx) + rgb2 * interp_idx)
+    for (idx, j) in smolyak_rules
+        interp_idx = (j - min_count) / (max_count - min_count)
+        col = round.(Int, rgb1 * (1 - interp_idx) + rgb2 * interp_idx)
         m_idx = mset.indices[idx]
         chars[(m_idx .+ 1)...] = rgb_char(col..., 'X', colored)
         back_indices = allBackwardAncestors(mset, idx)
         for bidx in back_indices
             m_idx_b = mset.indices[bidx]
-            chars[(m_idx_b .+1)...] = rgb_char(col..., 'o', colored)
+            chars[(m_idx_b .+ 1)...] = rgb_char(col..., 'o', colored)
         end
     end
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
@@ -452,7 +464,7 @@ o o o o o o o o X X
 o o o o o o o o o X X
 ```
 """
-function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
+function smolyakIndexing(mset::MultiIndexSet{d, T}) where {d, T}
     mset_full = mset # Alias to clarify in code what's going on
     N = length(mset_full)
     quad_rules = []
@@ -469,7 +481,7 @@ function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
         for idx_midx_loop in frontier_loop
             # Access the adjustment for this frontier member
             idx_midx_full = loop_indices_full_map[idx_midx_loop]
-            j = 1-occurrences[idx_midx_full] # Enforce o[i] + j = 1
+            j = 1 - occurrences[idx_midx_full] # Enforce o[i] + j = 1
             occurrences[idx_midx_full] = 1
 
             # Reindex the number of occurrences of the backward ancestors
@@ -485,13 +497,13 @@ function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
     quad_rules
 end
 
-function tensor_prod_quad(midx::SVector{d,Int}, rules::Vector) where {d}
+function tensor_prod_quad(midx::SVector{d, Int}, rules::Vector) where {d}
     rules_eval = [rules[i](midx[i]) for i in 1:d]
     # Create all indices for the tensor product rule
-    idxs = CartesianIndices(ntuple(k->1:length(rules_eval[k][1]), d))
-    points = Vector{SVector{d,Float64}}(undef, length(idxs))
+    idxs = CartesianIndices(ntuple(k -> 1:length(rules_eval[k][1]), d))
+    points = Vector{SVector{d, Float64}}(undef, length(idxs))
     weights = zeros(Float64, length(idxs))
-    @inbounds for (j,idx) in enumerate(idxs)
+    @inbounds for (j, idx) in enumerate(idxs)
         points[j] = SVector{d}([rules_eval[k][1][idx[k]] for k in 1:d])
         weights[j] = exp(sum(log(rules_eval[k][2][idx[k]]) for k in 1:d))
     end
@@ -513,19 +525,19 @@ function SmolyakQuadrature(mset::MultiIndexSet{d}, rules::Vector) where {d}
         throw(ArgumentError("Number of rules must match dimension"))
     end
     quad_rules = smolyakIndexing(mset)
-    unique_elems = Dict{SVector{d,Float64},Float64}()
+    unique_elems = Dict{SVector{d, Float64}, Float64}()
     for (idx, count) in quad_rules
         midx = mset[idx]
         pts_idx, wts_idx = tensor_prod_quad(midx, rules)
         for (pt, wt) in zip(pts_idx, wts_idx)
-            entry = get(unique_elems, pt, 0.)
-            unique_elems[pt] = entry + wt*count
+            entry = get(unique_elems, pt, 0.0)
+            unique_elems[pt] = entry + wt * count
         end
     end
     points = Matrix{Float64}(undef, d, length(unique_elems))
     weights = Vector{Float64}(undef, length(unique_elems))
     for (i, (pt, wt)) in enumerate(unique_elems)
-        points[:,i] .= pt
+        points[:, i] .= pt
         weights[i] = wt
     end
     points, weights
@@ -539,9 +551,10 @@ end
 function create_example_hyperbolic2d(p)
     log2p = floor(Int, log2(p))
     pd2 = p ÷ 2
-    midx_rep = reduce(hcat, [tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:log2p-1)])
-    midx_ext = Int[midx_rep [pd2+1:p zeros(pd2)]' [zeros(pd2) pd2+1:p]']
-    MultiIndexSet(unique(midx_ext, dims=2))
+    midx_rep = reduce(
+        hcat, [tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:(log2p - 1))])
+    midx_ext = Int[midx_rep [(pd2 + 1):p zeros(pd2)]' [zeros(pd2) (pd2 + 1):p]']
+    MultiIndexSet(unique(midx_ext, dims = 2))
 end
 
 # Create a three-dimensional multi-index set with a hyperbolic limiter
@@ -549,8 +562,8 @@ function create_example_hyperbolic3d(p)
     log2p = floor(Int, log2(p))
     pd2 = p ÷ 2
     mset_rep = []
-    for logp_1 in 0:log2p-1
-        for logp_2 in 0:(log2p-1-logp_1)
+    for logp_1 in 0:(log2p - 1)
+        for logp_2 in 0:(log2p - 1 - logp_1)
             p_1 = 2^logp_1
             p_2 = 2^logp_2
             p_3 = 2^(log2p - (logp_1 + logp_2 + 1))
@@ -558,8 +571,8 @@ function create_example_hyperbolic3d(p)
         end
     end
     mset_rep = reduce(hcat, mset_rep)
-    mset_ext = Int[mset_rep [pd2+1:p zeros(pd2) zeros(pd2)]' [zeros(pd2) pd2+1:p zeros(pd2)]' [zeros(pd2) zeros(pd2) pd2+1:p]']
-    MultiIndexSet(unique(mset_ext, dims=2))
+    mset_ext = Int[mset_rep [(pd2 + 1):p zeros(pd2) zeros(pd2)]' [zeros(pd2) (pd2 + 1):p zeros(pd2)]' [zeros(pd2) zeros(pd2) (pd2 + 1):p]']
+    MultiIndexSet(unique(mset_ext, dims = 2))
 end
 
 export CreateTensorOrder, CreateTotalOrder, MultiIndexSet, isDownwardClosed
