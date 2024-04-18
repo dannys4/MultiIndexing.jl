@@ -34,7 +34,7 @@ Arguments:
 - `limit`: function that takes a multi-index and a limit and returns true if the index is admissible
 - `calc_reduced_margin`: if true, calculate the reduced margin of the set, otherwise leave it empty
 """
-function MultiIndexSet(indices_mat::Matrix{Int}, limit::T=NoLimiter, calc_reduced_margin=false) where {T}
+function MultiIndexSet(indices_mat::AbstractMatrix{Int}, limit::T=NoLimiter, calc_reduced_margin=false) where {T}
     d = size(indices_mat,1)
     indices = [SVector{d}(indices_mat[:,i]) for i in axes(indices_mat,2)]
     MultiIndexSet(indices, limit, calc_reduced_margin)
@@ -188,6 +188,21 @@ function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d,Int}, c
     true
 end
 
+function isDownwardClosed(mis::MultiIndexSet{d}) where {d}
+    for idx in mis.indices
+        tmp_idx = Vector(idx)
+        for i in 1:d
+            tmp_idx[i] == 0 && continue
+            tmp_idx[i] -= 1
+            if !(SVector{d}(tmp_idx) in mis.indices)
+                return false
+            end
+            tmp_idx[i] += 1
+        end
+    end
+    true
+end
+
 """
     allBackwardAncestors(mis, j)
 
@@ -230,7 +245,11 @@ function allBackwardAncestors(mis::MultiIndexSet{d}, j::Int) where {d}
     for (i, back_index) in enumerate(back_indices)
         if i < length(back_indices)
             check_back_index = isequal(SVector(Tuple(back_index)))
-            j_ancestors[i] = findfirst(check_back_index, mis.indices)
+            ancestor_i = findfirst(check_back_index, mis.indices)
+            if isnothing(ancestor_i)
+                @info "No back index:" back_index idx
+            end
+            j_ancestors[i] = ancestor_i
         end
     end
     j_ancestors
@@ -386,6 +405,18 @@ function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool=true)
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
 end
 
+# Given a subset of indices, find the minimal subset of the mset that contains them
+function subsetCompletion(mset::MultiIndexSet{d}, indices::AbstractVector{Int}) where {d}
+    completion = Set{Int}(indices)
+    for idx in indices
+        ancestors = allBackwardAncestors(mset, idx)
+        for a in ancestors
+            push!(completion, a)
+        end
+    end
+    collect(completion)
+end
+
 """
     smolyakIndexing(mset) -> Vector{Tuple{Int,Int}}
 
@@ -429,8 +460,9 @@ function smolyakIndexing(mset::MultiIndexSet{d,T}) where {d,T}
     loop_indices = collect(1:N)
     while sum(loop_indices) > 0
         # Form the mset for this loop
-        loop_indices_full_map = (1:N)[loop_indices]
-        mset_loop = MultiIndexSet{d,T}(mset_full.indices[loop_indices], [], mset_full.limit, true, mset_full.maxDegrees)
+        loop_indices_subset = (1:N)[loop_indices]
+        loop_indices_full_map = subsetCompletion(mset_full, loop_indices_subset)
+        mset_loop = MultiIndexSet(mset_full[loop_indices_full_map], mset_full.limit)
         frontier_loop = findReducedFrontier(mset_loop)
 
         # Adjust each frontier member and reindex their ancestors' number of occurrences
@@ -530,7 +562,7 @@ function create_example_hyperbolic3d(p)
     MultiIndexSet(unique(mset_ext, dims=2))
 end
 
-export CreateTensorOrder, CreateTotalOrder, MultiIndexSet
+export CreateTensorOrder, CreateTotalOrder, MultiIndexSet, isDownwardClosed
 export findReducedFrontier, allBackwardAncestors, smolyakIndexing
 export visualize_2d, visualize_smolyak_2d
 export create_example_hyperbolic2d, create_example_hyperbolic3d

@@ -1,3 +1,21 @@
+@testset "isDownwardClosed" begin
+    d, p = 5, 10
+    mset = CreateTotalOrder(d, p)
+    @test isDownwardClosed(mset)
+    mset_2_mat = Int[zeros(5) 1:5]'
+    mset_2 = MultiIndexSet(mset_2_mat)
+    @test !isDownwardClosed(mset_2)
+    mset_3_mat = Int[0:5 zeros(6)]'
+    mset_3 = MultiIndexSet(mset_3_mat)
+    @test isDownwardClosed(mset_3)
+    mset_4_mat = vcat(mset_3_mat', Int[zeros(6) 1:6])'
+    mset_4 = MultiIndexSet(mset_4_mat)
+    @test isDownwardClosed(mset_4)
+    mset_5_mat = hcat(mset_3_mat, Int[3,3])'
+    mset_5 = MultiIndexSet(mset_5_mat)
+    @test !isDownwardClosed(mset_5)
+end
+
 @testset "Backward Ancestors" begin
     d, p = 5, 10
     mset = CreateTotalOrder(d, p)
@@ -40,4 +58,17 @@ end
     end
     @test check_valid
     @test length(all_ancestors) == length(mis.indices) # All indices are a backward ancestor of at least one frontier index
+end
+
+@testset "Subset Completion" begin
+    mset = CreateTotalOrder(5, 10)
+    subset = 1:(length(mset)÷5):length(mset)
+    mset2 = MultiIndexSet(mset[subset])
+    completion_indices = MultiIndexing.subsetCompletion(mset, subset)
+    completion = MultiIndexSet(mset[completion_indices], mset.limit)
+    @test !isDownwardClosed(mset2) # Not necessary in general, but required for the test
+    @test isDownwardClosed(completion)
+    @test length(completion) > length(mset2)
+    @test all(c in mset.indices for c in completion)
+    @test all(c in completion for c in mset2.indices)
 end
