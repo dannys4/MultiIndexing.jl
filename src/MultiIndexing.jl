@@ -576,7 +576,7 @@ function create_example_hyperbolic3d(p)
 end
 
 export CreateTensorOrder, CreateTotalOrder, MultiIndexSet, isDownwardClosed
-export findReducedFrontier, allBackwardAncestors, smolyakIndexing
+export findReducedFrontier, allBackwardAncestors, smolyakIndexing, SmolyakQuadrature
 export visualize_2d, visualize_smolyak_2d
 export create_example_hyperbolic2d, create_example_hyperbolic3d
 end

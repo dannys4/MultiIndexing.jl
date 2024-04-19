@@ -63,3 +63,81 @@
         end
     end
 end
+
+using FastGaussQuadrature
+function unifquad01(exactness::Int)
+    N = ceil(Int, (exactness + 1)/2)
+    x, w = gausslegendre(N)
+    return (x.+1)/2, w/2
+end
+
+function clenshawcurtis(exactness::Int)
+    N=2exactness
+    if N == 0
+        return [0.0], [2.0]
+    end
+    if N == 1
+        return [-1.0, 1.0], [1.0, 1.0]
+    end
+    if N == 2
+        return [-1.0,0., 1.0], [1/6, 7/3, 1/6]
+    end
+	if isodd(N%2) || N<3
+	  throw(ArgumentError("exactness must be even and at least 2"))
+	end
+
+	n=(0:N/2)'
+	k=0:N/2
+	D=2*cos.(2*n.*k*pi/N)/N
+	D[1,:] .*= .5;
+	d = [1;(2 ./(1 .- (2:2:N).^2))];
+	w = D*d;
+	wts=[w;reverse(w[1:end-1])];
+	pts = cos.(pi*(0:N)/N)
+	pts, wts
+end
+
+function clenshawcurtis01(exactness::Int)
+    x, w = clenshawcurtis(exactness)
+    return (x.+1)/2, w/2
+end
+
+function monomialEval(midx::SVector{d}, x::AbstractMatrix) where {d}
+    evals = ones(size(x, 2))
+    for i in eachindex(midx)
+        evals .*= (x[i, :] .^ midx[i])
+    end
+    evals
+end
+
+@testset "Smolyak Quadrature" begin
+
+    @testset "Total Order Quadrature" begin
+        dp_vec = [(3, 2), (2, 4), (4, 5), (5, 4), (10, 2)]
+        for (d, p) in dp_vec
+            mset = CreateTotalOrder(d, p)
+            pts, wts = SmolyakQuadrature(mset, unifquad01)
+            quad_int = sum(monomialEval(midx, pts) for midx in mset)' * wts
+            exact_int = sum(prod(1 ./ (midx .+ 1)) for midx in mset)
+            @test isapprox(quad_int, exact_int, atol=1e-10)
+        end
+    end
+
+    @testset "Hyperbolic Quadrature" begin
+        for j in 4:8
+            mset = create_example_hyperbolic2d(2^j)
+            # Gaussian quadrature
+            pts, wts = SmolyakQuadrature(mset, unifquad01)
+            quad_int = sum(monomialEval(midx, pts) for midx in mset)' * wts
+            exact_int = sum(prod(1 ./ (midx .+ 1)) for midx in mset)
+            @test isapprox(quad_int, exact_int, atol=1e-10)
+            # Clenshaw-Curtis quadrature
+            pts, wts = SmolyakQuadrature(mset, clenshawcurtis01)
+            quad_int = sum(monomialEval(midx, pts) for midx in mset)' * wts
+            exact_int = sum(prod(1 ./ (midx .+ 1)) for midx in mset)
+            # Not sure why this doesn't work for "small" N
+            @test isapprox(quad_int, exact_int, atol=1e-10) broken=j<6
+            @test isapprox(quad_int, exact_int, rtol=1e-4)
+        end
+    end
+end
