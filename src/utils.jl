@@ -1,5 +1,4 @@
 export visualize_2d, visualize_smolyak_2d
-export create_example_hyperbolic2d, create_example_hyperbolic3d
 
 """
     visualize_2d(mset_mat, markers)
@@ -75,32 +74,4 @@ function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool = true)
         end
     end
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
-end
-
-# Create a two-dimensional multi-index set with a hyperbolic limiter
-function create_example_hyperbolic2d(p)
-    log2p = floor(Int, log2(p))
-    pd2 = p ÷ 2
-    midx_rep = reduce(
-        hcat, [tens_prod_mat(@SVector[p_1, pd2 ÷ p_1]) for p_1 in 2 .^ (0:(log2p - 1))])
-    midx_ext = Int[midx_rep [(pd2 + 1):p zeros(pd2)]' [zeros(pd2) (pd2 + 1):p]']
-    MultiIndexSet(unique(midx_ext, dims = 2))
-end
-
-# Create a three-dimensional multi-index set with a hyperbolic limiter
-function create_example_hyperbolic3d(p)
-    log2p = floor(Int, log2(p))
-    pd2 = p ÷ 2
-    mset_rep = []
-    for logp_1 in 0:(log2p - 1)
-        for logp_2 in 0:(log2p - 1 - logp_1)
-            p_1 = 2^logp_1
-            p_2 = 2^logp_2
-            p_3 = 2^(log2p - (logp_1 + logp_2 + 1))
-            push!(mset_rep, tens_prod_mat(@SVector[p_1, p_2, p_3]))
-        end
-    end
-    mset_rep = reduce(hcat, mset_rep)
-    mset_ext = Int[mset_rep [(pd2 + 1):p zeros(pd2) zeros(pd2)]' [zeros(pd2) (pd2 + 1):p zeros(pd2)]' [zeros(pd2) zeros(pd2) (pd2 + 1):p]']
-    MultiIndexSet(unique(mset_ext, dims = 2))
 end

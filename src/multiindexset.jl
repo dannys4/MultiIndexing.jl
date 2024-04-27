@@ -1,4 +1,4 @@
-export CreateTensorOrder, CreateTotalOrder, MultiIndexSet
+export MultiIndexSet
 export allBackwardAncestors, findReducedFrontier
 export isDownwardClosed, subsetCompletion
 
@@ -60,110 +60,6 @@ end
 
 function Base.vec(mis::MultiIndexSet{d}) where {d}
     collect.(mis.indices)
-end
-
-# Creates a matrix of multi-indices of total order p
-# returns the matrix and the index where the frontier starts
-function CreateTotalOrder_matrix(d::Int, p::Int)
-    Mk = zeros(Int, d, 1)
-    M = Mk
-    last_start = -1
-    for j in 1:p
-        Mk = repeat(Mk, 1, d) + kron(I(d), ones(Int, 1, size(Mk, 2)))
-        Mk = unique(Mk, dims = 2)
-        M = hcat(M, Mk)
-        j == p - 1 && (last_start = size(M, 2) + 1)
-    end
-    M, last_start
-end
-
-NoLimiter = Returns(true)
-
-SumLimiter = (x::StaticVector, p) -> sum(x) <= p
-
-struct AnisotropicLimiter{d, T}
-    weights::StaticVector{d, Float64}
-    limit::T
-    function AnisotropicLimiter(
-            weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
-        _d = length(weights)
-        new{_d, _T}(SVector{_d}(weights), limit)
-    end
-end
-
-function (lim::AnisotropicLimiter{d})(index::StaticVector{d}, p) where {d}
-    lim.limit(index .* lim.weights, p)
-end
-
-struct CurvedLimiter{d, T}
-    curve_weights::StaticVector{d, Float64}
-    limit::T
-    function CurvedLimiter(
-            curve_weights::AbstractVector{Float64}, limit::_T = SumLimiter) where {_T}
-        _d = length(curve_weights)
-        new{_d, _T}(SVector{_d}(curve_weights), limit)
-    end
-end
-
-function (lim::CurvedLimiter{d})(index::StaticVector{d}, p) where {d}
-    lim.limit(index + lim.curve_weights .* log1p.(index), p)
-end
-
-"""
-    CreateTotalOrder(d, p, limit)
-
-Create a multi-index set with total order p
-"""
-function CreateTotalOrder(d::Int, p, limit = NoLimiter)
-    mset_mat, last_start = CreateTotalOrder_matrix(d, ceil(p))
-    frontier = @view mset_mat[:, last_start:end]
-    indices = [SVector{d}(mset_mat[:, i])
-               for i in axes(mset_mat, 2) if limit(SVector{d}(mset_mat[:, i]), p)]
-    reduced_margin = Vector{StaticVector{d, Int}}(undef, size(frontier, 2) * d)
-    rm_idx = 1
-    max_degrees = zeros(Int, d)
-    full_limited = true
-    @inbounds for i in axes(frontier, 2)
-        m_idx = frontier[:, i]
-        limit(SVector{d}(m_idx), p) && for j in 1:d
-            max_degrees[j] = max(max_degrees[j], m_idx[j])
-            m_idx[j] += 1
-            static_m_idx = SVector{d}(m_idx)
-            if limit(static_m_idx, p + 1)
-                reduced_margin[rm_idx] = static_m_idx
-                rm_idx += 1
-            end
-            m_idx[j] -= 1
-            full_limited &= false
-        end
-    end
-    full_limited && @warn "No valid reduced margin found on frontier"
-    MultiIndexSet{d, typeof(limit)}(indices, unique(reduced_margin[1:(rm_idx - 1)]),
-        limit, true, SVector{d}(max_degrees))
-end
-
-function tens_prod_mat(idx)
-    reduce(
-        hcat, collect.(Tuple.(vec(CartesianIndices(ntuple(k -> 0:idx[k], length(idx)))))))
-end
-function tens_prod_mat(p, d)
-    tens_prod_mat(fill(p, d))
-end
-
-"""
-    CreateTensorOrder(d, p, limit)
-
-Create a multi-index set with tensor order p
-"""
-function CreateTensorOrder(d::Int, p::Int, limit::T = NoLimiter) where {T}
-    indices_arr = CartesianIndices(ntuple(_ -> 0:p, d))
-    indices = [SVector(Tuple(idx))
-               for idx in vec(indices_arr) if limit(SVector(Tuple(idx)), p)]
-    reduced_margin_arr = CartesianIndices(ntuple(_ -> 0:(p + 1), d))
-    reduced_margin = [SVector(Tuple(idx))
-                      for idx in vec(reduced_margin_arr)
-                      if any(idx .> p) && limit(SVector(Tuple(idx)), p + 1)]
-    MultiIndexSet{d, T}(indices, reduced_margin, limit, true, SVector{d}(fill(p, d)))
 end
 
 # Searches backward through the mset backward for an index
