@@ -1,4 +1,6 @@
-export visualize_2d, visualize_smolyak_2d, create_example_hyperbolic2d, create_example_hyperbolic3d
+export visualize_2d, visualize_smolyak_2d
+export create_example_hyperbolic2d, create_example_hyperbolic3d
+
 """
     visualize_2d(mset_mat, markers)
 
@@ -33,7 +35,6 @@ function visualize_2d(mset, markers = 'X')
     rows = [join(c, ' ') for c in eachrow(chars)]
     join(rows, "\n")
 end
-
 
 function rgb_char(r, g, b, char, colored)
     colored ? "\e[1m\e[38;2;$r;$g;$b;249m$char\e[0m" : string(char)
@@ -75,7 +76,6 @@ function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool = true)
     end
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
 end
-
 
 # Create a two-dimensional multi-index set with a hyperbolic limiter
 function create_example_hyperbolic2d(p)
