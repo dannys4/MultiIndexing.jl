@@ -16,6 +16,7 @@ struct FixedMultiIndexSet{d}
     starts::Vector{Int}
     nz_indices::Vector{Int}
     nz_values::Vector{Int}
+    max_orders::SVector{d}
 end
 
 function FixedMultiIndexSet(mset::MultiIndexSet{d}) where {d}
@@ -24,17 +25,20 @@ function FixedMultiIndexSet(mset::MultiIndexSet{d}) where {d}
     starts = Vector{Int}(undef, length(indices) + 1)
     nz_indices = Vector{Int}(undef, M)
     nz_values = Vector{Int}(undef, M)
+    max_orders_ = zeros(Int, d)
     nz_idx = 1
-    for (i, idx) in enumerate(indices)
+    @inbounds for (i, idx) in enumerate(indices)
         starts[i] = nz_idx
-        for (j, val) in enumerate(idx)
+        @inbounds for (j, val) in enumerate(idx)
             if val != 0
                 nz_indices[nz_idx] = j
                 nz_values[nz_idx] = val
+                max_orders_[j] = max(max_orders_[j], val)
                 nz_idx += 1
             end
         end
     end
+    max_orders = SVector{d}(max_orders_)
     starts[end] = M + 1
-    FixedMultiIndexSet{d}(starts, nz_indices, nz_values)
+    FixedMultiIndexSet{d}(starts, nz_indices, nz_values, max_orders)
 end

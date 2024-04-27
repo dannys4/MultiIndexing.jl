@@ -11,4 +11,5 @@
     @test fmset.starts == starts
     @test fmset.nz_indices == nz_indices
     @test fmset.nz_values == nz_values
+    @test fmset.max_orders == SVector{d}(fill(p, d))
 end
