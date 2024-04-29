@@ -1,5 +1,7 @@
 export FixedMultiIndexSet
 
+import Base: length
+
 """
 A FixedMultiIndexSet is a sparse representation of a multi-index set,
 where we only keep track of nonzero values.
@@ -42,3 +44,5 @@ function FixedMultiIndexSet(mset::MultiIndexSet{d}) where {d}
     starts[end] = M + 1
     FixedMultiIndexSet{d}(starts, nz_indices, nz_values, max_orders)
 end
+
+Base.length(fmset::FixedMultiIndexSet) = length(fmset.starts) - 1

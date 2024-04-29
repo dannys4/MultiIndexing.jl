@@ -1,3 +1,5 @@
+using Random
+
 @testset "FixedMultiIndexSet Creation" begin
     d, p = 5, 10
     mset = CreateTotalOrder(d, p)
@@ -8,6 +10,7 @@
     nz_values = nz_info[:,1]
     nz_indices = nz_info[:,2]
     fmset = FixedMultiIndexSet(mset)
+    @test length(fmset) == length(mset)
     @test fmset.starts == starts
     @test fmset.nz_indices == nz_indices
     @test fmset.nz_values == nz_values
