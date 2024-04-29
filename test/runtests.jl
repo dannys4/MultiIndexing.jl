@@ -23,6 +23,10 @@ end
         include("multiindexset_fcn.jl")
     end
 
+    @testset "FixedMultiIndexSet" begin
+        include("fixedmultiindexset.jl")
+    end
+
     @testset "Smolyak" begin
         include("smolyak.jl")
     end
