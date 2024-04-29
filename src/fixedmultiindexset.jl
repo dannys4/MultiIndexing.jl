@@ -14,10 +14,10 @@ nz_indices and nz_values will have the same length `M`, and
 if there are `N` multi-indices, then `length(starts) == N + 1`.
 By construction, `starts[1] == 1` and `starts[N + 1] == M + 1`.
 """
-struct FixedMultiIndexSet{d}
-    starts::Vector{Int}
-    nz_indices::Vector{Int}
-    nz_values::Vector{Int}
+struct FixedMultiIndexSet{d,T<:AbstractVector{<:Integer}}
+    starts::T
+    nz_indices::T
+    nz_values::T
     max_orders::SVector{d}
 end
 
@@ -42,7 +42,7 @@ function FixedMultiIndexSet(mset::MultiIndexSet{d}) where {d}
     end
     max_orders = SVector{d}(max_orders_)
     starts[end] = M + 1
-    FixedMultiIndexSet{d}(starts, nz_indices, nz_values, max_orders)
+    FixedMultiIndexSet{d,Vector{Int}}(starts, nz_indices, nz_values, max_orders)
 end
 
 Base.length(fmset::FixedMultiIndexSet) = length(fmset.starts) - 1
