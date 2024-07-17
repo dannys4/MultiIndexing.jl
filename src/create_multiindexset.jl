@@ -101,7 +101,7 @@ function CreateTensorOrder(d::Int, p::Int, limit::T = NoLimiter) where {T}
     reduced_margin_arr = CartesianIndices(ntuple(_ -> 0:(p + 1), d))
     reduced_margin = [SVector(Tuple(idx))
                       for idx in vec(reduced_margin_arr)
-                      if any(idx .> p) && limit(SVector(Tuple(idx)), p + 1)]
+                      if any(Tuple(idx) .> p) && limit(SVector(Tuple(idx)), p + 1)]
     MultiIndexSet{d, T}(indices, reduced_margin, limit, true, SVector{d}(fill(p, d)))
 end
 
