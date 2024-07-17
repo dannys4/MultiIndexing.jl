@@ -1,3 +1,5 @@
+using FFTW, FastGaussQuadrature
+
 @testset "Smolyak Indexing" begin
     @testset "Total Order Formulae" begin
         dp_vec = [(3, 2), (2, 4), (4, 5), (5, 4), (10, 2)]
@@ -64,42 +66,41 @@
     end
 end
 
-using FastGaussQuadrature
 function unifquad01(exactness::Int)
     N = ceil(Int, (exactness + 1)/2)
     x, w = gausslegendre(N)
     return (x.+1)/2, w/2
 end
 
-function clenshawcurtis(exactness::Int)
-    N=2exactness
-    if N == 0
-        return [0.0], [2.0]
+# Inspired by implementation in ChaosPy: https://github.com/jonathf/chaospy/blob/53000bbb04f8d3f9908ebbf1be6bf139a21c2e6e/chaospy/quadrature/clenshaw_curtis.py#L76
+function clenshawcurtis01(order::Int)
+    if order == 0
+        return [0.5], [1.0]
+    elseif order == 1
+        return [0.0, 1.0], [0.5, 0.5]
     end
-    if N == 1
-        return [-1.0, 1.0], [1.0, 1.0]
-    end
-    if N == 2
-        return [-1.0,0., 1.0], [1/6, 7/3, 1/6]
-    end
-	if isodd(N%2) || N<3
-	  throw(ArgumentError("exactness must be even and at least 2"))
-	end
 
-	n=(0:N/2)'
-	k=0:N/2
-	D=2*cos.(2*n.*k*pi/N)/N
-	D[1,:] .*= .5;
-	d = [1;(2 ./(1 .- (2:2:N).^2))];
-	w = D*d;
-	wts=[w;reverse(w[1:end-1])];
-	pts = cos.(pi*(0:N)/N)
-	pts, wts
-end
+    theta = (order .- (0:order)) .* π / order
+    abscissas = 0.5 .* cos.(theta) .+ 0.5
 
-function clenshawcurtis01(exactness::Int)
-    x, w = clenshawcurtis(exactness)
-    return (x.+1)/2, w/2
+    steps = 1:2:order-1
+    L = length(steps)
+    remains = order - L
+
+    beta = vcat(2.0 ./ (steps .* (steps .- 2)), [1.0 / steps[end]], zeros(remains))
+    beta = -beta[1:end-1] .- reverse(beta[2:end])
+
+    gamma = -ones(order)
+    gamma[L+1] += order
+    gamma[remains+1] += order
+    gamma ./= order^2 - 1 + (order % 2)
+
+    weights = rfft(beta + gamma)/order
+    @assert maximum(imag.(weights)) < 1e-15
+    weights = real.(weights)
+    weights = vcat(weights, reverse(weights)[2 - (order % 2):end]) ./ 2
+
+    return abscissas, weights
 end
 
 function monomialEval(midx::SVector{d}, x::AbstractMatrix) where {d}
@@ -125,19 +126,20 @@ end
 
     @testset "Hyperbolic Quadrature" begin
         for j in 4:8
+
             mset = create_example_hyperbolic2d(2^j)
+            prev_mset = create_example_hyperbolic2d(2^(j-1))
             # Gaussian quadrature
             pts, wts = SmolyakQuadrature(mset, unifquad01)
             quad_int = sum(monomialEval(midx, pts) for midx in mset)' * wts
-            exact_int = sum(prod(1 ./ (midx .+ 1)) for midx in mset)
+            exact_int = sum(exp(sum(k->log(1/(k+1)), midx)) for midx in mset)
             @test isapprox(quad_int, exact_int, atol=1e-10)
             # Clenshaw-Curtis quadrature
             pts, wts = SmolyakQuadrature(mset, clenshawcurtis01)
+            # For N points, exact on N-1 polynomials; therefore, not actually exact on mset
             quad_int = sum(monomialEval(midx, pts) for midx in mset)' * wts
-            exact_int = sum(prod(1 ./ (midx .+ 1)) for midx in mset)
-            # Not sure why this doesn't work for "small" N
-            @test isapprox(quad_int, exact_int, atol=1e-10) broken=j<6
-            @test isapprox(quad_int, exact_int, rtol=1e-4)
+            exact_int = sum(exp(sum(k->-log(k+1), midx)) for midx in mset)
+            @test isapprox(quad_int, exact_int, atol=1e-10)
         end
     end
 end

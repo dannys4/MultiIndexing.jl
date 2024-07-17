@@ -12,6 +12,12 @@
 
     # Test basic set creation
     d, p = 5, 4
+    # Test Tensor order
+    mset = MultiIndexing.CreateTensorOrder(d, p)
+    mis_matrix = reduce(hcat, mset.indices)
+    @test d^(p+1) == size(mis_matrix,2)
+    @test all(mis_matrix .<= p)
+
     # Create a slightly larger set to capture reduced margin
     mset, last_start = MultiIndexing.CreateTotalOrder_matrix(d, p + 1)
     mis = MultiIndexing.CreateTotalOrder(d, p)
