@@ -70,13 +70,15 @@ end
 
 function tensor_prod_quad(midx::SVector{d, Int}, rules::Vector) where {d}
     rules_eval = [rules[i](midx[i]) for i in 1:d]
+    points_1d = [p for (p,_) in rules_eval]
+    log_wts_1d = [log.(w) for (_,w) in rules_eval]
     # Create all indices for the tensor product rule
     idxs = CartesianIndices(ntuple(k -> 1:length(rules_eval[k][1]), d))
     points = Vector{SVector{d, Float64}}(undef, length(idxs))
     weights = zeros(Float64, length(idxs))
     @inbounds for (j, idx) in enumerate(idxs)
-        points[j] = SVector{d}([rules_eval[k][1][idx[k]] for k in 1:d])
-        weights[j] = exp(sum(log(rules_eval[k][2][idx[k]]) for k in 1:d))
+        points[j] = SVector{d}([points_1d[k][idx[k]] for k in 1:d])
+        weights[j] = exp(sum(log_wts_1d[k][idx[k]] for k in 1:d))
     end
     points, weights
 end
