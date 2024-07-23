@@ -26,10 +26,10 @@ function visualize_2d(mset, markers = 'X')
         mset = reduce(hcat, mset.indices)
     end
     @assert size(mset, 1)==2 "Only 2D visualization supported"
-    chars = fill(' ', (maximum(mset, dims = 2) .+ 1)...)
+    chars = fill(' ', (reverse(maximum(mset, dims = 2)) .+ 1)...)
     for j in axes(mset, 2)
         mark = markers isa Char ? markers : markers[j]
-        chars[end - mset[1, j], mset[2, j] + 1] = mark
+        chars[end - mset[2, j], mset[1, j] + 1] = mark
     end
     rows = [join(c, ' ') for c in eachrow(chars)]
     join(rows, "\n")
@@ -76,7 +76,7 @@ function visualize_smolyak_2d(mset::MultiIndexSet, colored::Bool = true)
     join([join(c, ' ') for c in eachrow(chars)][end:-1:1], "\n")
 end
 
-using Base: collect, pop!, push!
+using Base: collect, pop!, push!, peek, isempty
 
 mutable struct SortedListNode{P}
     payload::Union{Nothing,P}
@@ -110,6 +110,16 @@ function Base.pop!(list::SortedList)
     isnothing(ret_node.payload) && return nothing
     list.head.next = ret_node.next
     ret_node.payload
+end
+
+function Base.peek(list::SortedList)
+    ret_node = list.head.next
+    isnothing(ret_node.payload) && return nothing
+    ret_node.payload
+end
+
+function Base.isempty(list::SortedList)
+    isnothing(peek(list))
 end
 
 function Base.collect(list::SortedList{T}) where {T}

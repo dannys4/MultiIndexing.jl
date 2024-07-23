@@ -23,7 +23,7 @@
     mis = MultiIndexing.CreateTotalOrder(d, p)
     mis_matrix = reduce(hcat, mis.indices)
     @test mset[:, 1:(last_start - 1)] == mis_matrix # Indices are wrong
-    @test mis.isDownwardClosed # Set is not downward closed
+    @test isDownwardClosed(mis) # Set is not downward closed
     @test mis.limit == MultiIndexing.NoLimiter # Set has a limiter
     @test collect(mis.maxDegrees) == fill(p, d) # Max degrees are wrong
     rm_matrix = reduce(hcat, mis.reduced_margin)
@@ -38,7 +38,7 @@ end
     @test_logs (:warn, "No valid reduced margin found on frontier") (mis=CreateTotalOrder(
         d, p, empty_limiter))
     @test length(mis.indices) == 0 # Set is nonempty
-    @test mis.isDownwardClosed # Set is not downward closed
+    @test isDownwardClosed(mis) # Set is not downward closed
     @test mis.limit == empty_limiter # Set has a limiter
     @test collect(mis.maxDegrees) == zeros(Int, d) # Max degrees are wrong
     @test length(mis.reduced_margin) == 0 # Reduced margin is nonempty
@@ -47,7 +47,7 @@ end
     rng = Xoshiro(80284)
     mis = create_example_curved(rng, d, p)
     @test mis.limit isa MultiIndexing.CurvedLimiter # Set has a limiter
-    @test mis.isDownwardClosed # Set is downward closed
+    @test isDownwardClosed(mis) # Set is downward closed
     @test all(collect(mis.maxDegrees) .<= fill(p, d)) # Max degrees at most p
     @test mis.maxDegrees[1] == p # Max degree of first index is p
     @test all(collect(mis.maxDegrees) .>= 0) # Max degrees at least 0
