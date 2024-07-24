@@ -16,11 +16,7 @@ include("test_utils.jl")
         include("fixedmultiindexset.jl")
     end
 
-    @testset "Smolyak" begin
+    @testset "Smolyak Indexing" begin
         include("smolyak.jl")
-    end
-
-    @testset "Adaptive Sparse Grid" begin
-        include("adaptiveSparseGrid.jl")
     end
 end
