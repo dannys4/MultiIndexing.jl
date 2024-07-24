@@ -22,7 +22,8 @@ function MultiIndexSet(indices::Vector{SVector{d, Int}}, limit::T = NoLimiter,
     maxDegrees = MVector{d}(reduce((x, y) -> max.(x, y), indices, init = zeros(Int, d)))
     mset = MultiIndexSet{d, T}(indices, reduced_margin, limit, maxDegrees)
     if calc_reduced_margin
-        isDownwardClosed(mset) || throw(ArgumentError("calc_reduced_margin = true, but mset is not downward closed"))
+        isDownwardClosed(mset) ||
+            throw(ArgumentError("calc_reduced_margin = true, but mset is not downward closed"))
         frontier = findReducedFrontier(mset)
         for idx in frontier
             midx = mset[idx]

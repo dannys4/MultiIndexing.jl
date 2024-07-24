@@ -1,21 +1,55 @@
 @testset "Basic Total Order" begin
-    d, p = 2, 3
-    hardcoded_mset = [0 1 0 2 1 0 3 2 1 0; 0 0 1 0 1 2 0 1 2 3]
-    harcoded_last_start = 7
+    @testset "Base cases" begin
+        d = 3
+        # p = 0
+        mset = CreateTotalOrder(d, 0)
+        @test length(mset) == 1
+        @test mset[1] == SVector{d}(zeros(Int, d))
+        @test length(unique(mset.reduced_margin)) == d
+        @test all(sum.(mset.reduced_margin) .== 1)
 
-    # Test matrix creation
-    mset, last_start = MultiIndexing.CreateTotalOrder_matrix(d, p)
-    @test all(sum(mset[:, last_start:end], dims = 1) .== p) # Last start is wrong
-    @test all(sum(mset[:, 1:(last_start - 1)], dims = 1) .< p) # First part is wrong
-    @test mset == hardcoded_mset # Matrix is wrong
-    @test last_start == harcoded_last_start # Last start is wrong
+        # p = 1
+        mset = CreateTotalOrder(d, 1)
+        @test length(mset) == d + 1
+        @test length(mset) == length(unique(mset.indices))
+        @test mset[1] == SVector{d}(zeros(Int, d))
+        @test all(sum.(mset)[2:end] .== 1)
+        @test length(mset.reduced_margin) == (d * (d + 1)) ÷ 2
+        @test length(unique(mset.reduced_margin)) == length(mset.reduced_margin)
+        @test all(sum.(mset.reduced_margin) .== 2)
+    end
+    @testset "General case" begin
+        d, p = 2, 3
+        hardcoded_mset = [0 1 0 2 1 0 3 2 1 0; 0 0 1 0 1 2 0 1 2 3]
+        hardcoded_last_start = 7
 
+        # Test matrix creation
+        mset, last_start = MultiIndexing.CreateTotalOrder_matrix(d, p)
+        @test all(sum(mset[:, last_start:end], dims = 1) .== p) # Last start is wrong
+        @test all(sum(mset[:, 1:(last_start - 1)], dims = 1) .< p) # First part is wrong
+        @test mset == hardcoded_mset # Matrix is wrong
+        @test last_start == hardcoded_last_start # Last start is wrong
+
+        # Create a slightly larger set to capture reduced margin
+        mset, last_start = MultiIndexing.CreateTotalOrder_matrix(d, p + 1)
+        mis = MultiIndexing.CreateTotalOrder(d, p)
+        mis_matrix = reduce(hcat, mis.indices)
+        @test mset[:, 1:(last_start - 1)] == mis_matrix # Indices are wrong
+        @test isDownwardClosed(mis) # Set is not downward closed
+        @test mis.limit == MultiIndexing.NoLimiter # Set has a limiter
+        @test collect(mis.maxDegrees) == fill(p, d) # Max degrees are wrong
+        rm_matrix = reduce(hcat, mis.reduced_margin)
+        @test rm_matrix == mset[:, last_start:end] # Reduced margin is wrong
+    end
+end
+
+@testset "Basic Tensor Order" begin
     # Test basic set creation
     d, p = 5, 4
     # Test Tensor order
     mset = MultiIndexing.CreateTensorOrder(d, p)
     mis_matrix = reduce(hcat, mset.indices)
-    @test d^(p+1) == size(mis_matrix,2)
+    @test d^(p + 1) == size(mis_matrix, 2)
     @test all(mis_matrix .<= p)
 
     # Create a slightly larger set to capture reduced margin

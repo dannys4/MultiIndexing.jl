@@ -57,34 +57,35 @@ function CreateTotalOrder(d::Int, p, limit::T = NoLimiter) where {T}
     p = ceil(Int, p)
     p < 0 && throw(ArgumentError("Invalid total order $p"))
     if p == 0
-        rm = Vector{StaticVector{d,Int}}(undef, d)
-        midx_tmp = zeros(Int,d)
+        rm = Vector{StaticVector{d, Int}}(undef, d)
+        midx_tmp = zeros(Int, d)
         for j in 1:d
             midx_tmp[j] += 1
             rm[j] = SVector{d}(midx_tmp)
             midx_tmp[j] -= 1
         end
-        rm = filter(midx->limit(midx,p), rm)
-        return MultiIndexSet{d,T}([SVector{d}(zeros(Int,d))], rm, limit, MVector{d}(ntuple(Returns(0),d)))
+        rm = filter(midx -> limit(midx, p), rm)
+        return MultiIndexSet{d, T}(
+            [SVector{d}(zeros(Int, d))], rm, limit, MVector{d}(ntuple(Returns(0), d)))
     elseif p == 1
-        rm = StaticVector{d,Int}[]
-        indices = StaticVector{d,Int}[SVector{d}(ntuple(Returns(0),d))]
-        sizehint!(indices, d+1)
-        sizehint!(rm, d*d)
+        rm = StaticVector{d, Int}[]
+        indices = StaticVector{d, Int}[SVector{d}(ntuple(Returns(0), d))]
+        sizehint!(indices, d + 1)
+        sizehint!(rm, d * d)
         rm_idx = 1
         tmp_midx = zeros(Int, d)
         for j1 in 1:d
             tmp_midx[j1] += 1
             midx_j1 = SVector{d}(tmp_midx)
-            limit(midx_j1,p) && push!(indices, midx_j1)
-            for j2 in 1:d
+            limit(midx_j1, p) && push!(indices, midx_j1)
+            for j2 in j1:d
                 tmp_midx[j2] += 1
                 limit(tmp_midx, p) && push!(rm, SVector{d}(tmp_midx))
                 tmp_midx[j2] -= 1
             end
             tmp_midx[j1] -= 1
         end
-        return MultiIndexSet{d,T}(indices, rm, limit, MVector{d}(ntuple(Returns(1),d)))
+        return MultiIndexSet{d, T}(indices, rm, limit, MVector{d}(ntuple(Returns(1), d)))
     end
     mset_mat, last_start = CreateTotalOrder_matrix(d, p)
     frontier = @view mset_mat[:, last_start:end]
@@ -117,9 +118,6 @@ function tens_prod_mat(idx)
     reduce(
         hcat, collect.(Tuple.(vec(CartesianIndices(ntuple(k -> 0:idx[k], length(idx)))))))
 end
-function tens_prod_mat(p, d)
-    tens_prod_mat(fill(p, d))
-end
 
 """
     CreateTensorOrder(d, p, limit)
@@ -136,7 +134,6 @@ function CreateTensorOrder(d::Int, p::Int, limit::T = NoLimiter) where {T}
                       if any(Tuple(idx) .> p) && limit(SVector(Tuple(idx)), p + 1)]
     MultiIndexSet{d, T}(indices, reduced_margin, limit, SVector{d}(fill(p, d)))
 end
-
 
 # Create a two-dimensional multi-index set with a hyperbolic limiter
 function create_example_hyperbolic2d(p)
