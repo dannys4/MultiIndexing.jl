@@ -195,15 +195,9 @@ function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) 
 end
 
 function Base.push!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
-    if idx in mis.indices
-        @info "push!: idx $idx found in indices"
-        return true
-    end
+    idx in mis.indices && return false
     # Force index to be valid
-    if !isAdmissible(mis, idx)
-        @info "push!: index $idx is not admissible"
-        return false
-    end
+    !isAdmissible(mis, idx) && return false
     push!(mis.indices, idx)
     updateMaxDegrees!(mis, idx)
     # Update reduced margin if downward closed

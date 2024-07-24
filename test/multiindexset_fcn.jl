@@ -33,6 +33,7 @@ end
     mset_set = Set(mset.indices)
     mset_2_set = Set(mset_2.indices)
     @test mset_set == mset_2_set
+    @test !push!(mset, SVector{d}(ones(Int,d)))
 end
 
 @testset "Backward Ancestors" begin
