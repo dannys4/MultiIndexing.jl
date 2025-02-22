@@ -26,10 +26,10 @@ function visualize_2d(mset, markers = 'X')
         mset = reduce(hcat, mset.indices)
     end
     @assert size(mset, 1)==2 "Only 2D visualization supported"
-    chars = fill(' ', (maximum(mset, dims = 2) .+ 1)...)
+    chars = fill(' ', (reverse(maximum(mset, dims = 2)) .+ 1)...)
     for j in axes(mset, 2)
         mark = markers isa Char ? markers : markers[j]
-        chars[end - mset[1, j], mset[2, j] + 1] = mark
+        chars[end - mset[2, j], mset[1, j] + 1] = mark
     end
     rows = [join(c, ' ') for c in eachrow(chars)]
     join(rows, "\n")

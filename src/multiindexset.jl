@@ -13,18 +13,24 @@ struct MultiIndexSet{d, T}
     indices::Vector{SVector{d, Int}}
     reduced_margin::Vector{StaticVector{d, Int}}
     limit::T
-    isDownwardClosed::Bool
     maxDegrees::MVector{d, Int}
 end
 
 function MultiIndexSet(indices::Vector{SVector{d, Int}}, limit::T = NoLimiter,
         calc_reduced_margin = false) where {d, T}
     reduced_margin = []
-    if calc_reduced_margin
-        throw(ArgumentError("Reduced margin calculation not implemented"))
-    end
     maxDegrees = MVector{d}(reduce((x, y) -> max.(x, y), indices, init = zeros(Int, d)))
-    MultiIndexSet{d, T}(indices, reduced_margin, limit, true, maxDegrees)
+    mset = MultiIndexSet{d, T}(indices, reduced_margin, limit, maxDegrees)
+    if calc_reduced_margin
+        isDownwardClosed(mset) ||
+            throw(ArgumentError("calc_reduced_margin = true, but mset is not downward closed"))
+        frontier = findReducedFrontier(mset)
+        for idx in frontier
+            midx = mset[idx]
+            isAdmissible(mset, midx) && push!(reduced_margin, midx)
+        end
+    end
+    mset
 end
 
 """
@@ -72,27 +78,28 @@ function in_mset_backward(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) wher
 end
 
 """
-    checkIndexAdmissible(mis, idx, check_indices)
+    isAdmissible(mis, idx, check_indices)
 
 Check if an index is admissible to add to a reduced margin
 """
-function checkIndexAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d, Int},
-        check_indices::Bool = false) where {d}
+function isAdmissible(mis::MultiIndexSet{d}, idx::StaticVector{d, Int},
+        search_backward::Bool = true) where {d}
+    # If there's no reduced margin calculated, anything is admissible
+    length(mis.reduced_margin) == 0 && length(mis) > 0 && return true
     # If any index is greater than the limit, return false
-    mis.limit(idx) && return false
+    mis.limit(idx) || return false
     # If more than one subindex is greater than its max degree, return false
     sum(idx .>= mis.maxDegrees .+ 1) > 1 && return false
     # Check if the index is in the reduced margin
-    idx in mis.reduced_margin && return false
-    if check_indices # Check if the index is in the indices (expensive)
-        idx in mis.indices && return false
-    end
+    idx in mis.reduced_margin && return true
     # Otherwise, check that all backward neighbors of the index is in the set
     idx_tmp = Vector(idx)
     for i in 1:d
         idx[i] == 0 && continue
         idx_tmp[i] -= 1
-        !(SVector{d}(idx_tmp) in mis.indices) && return false
+        idx_i = SVector{d}(idx_tmp)
+        in_mset_i = search_backward ? in_mset_backward(mis, idx_i) : idx_i in mis.indices
+        in_mset_i || return false
         idx_tmp[i] += 1
     end
     true
@@ -172,6 +179,7 @@ end
 
 # Update the reduced margin of a set after adding an index
 function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
+    length(mis.reduced_margin) == 0 && length(mis.indices) > 0 && return
     j = findfirst(isequal(idx), mis.reduced_margin)
     # delete idx from reduced margin
     deleteat!(mis.reduced_margin, j)
@@ -180,7 +188,7 @@ function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) 
     for i in 1:d
         idx_tmp[i] += 1
         tmp_i = SVector{d}(idx_tmp)
-        if checkIndexValid(mis, tmp_i, false)
+        if isAdmissible(mis, tmp_i, false)
             push!(mis.reduced_margin, tmp_i)
         end
         idx_tmp[i] -= 1
@@ -188,16 +196,14 @@ function updateReducedMargin!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) 
 end
 
 function Base.push!(mis::MultiIndexSet{d}, idx::StaticVector{d, Int}) where {d}
-    (idx in mis.indices) && return true
-    isValid = checkIndexValid(mis, idx)
-    mis.isDownwardClosed = isValid
+    idx in mis.indices && return false
+    # Force index to be valid
+    !isAdmissible(mis, idx) && return false
     push!(mis.indices, idx)
     updateMaxDegrees!(mis, idx)
     # Update reduced margin if downward closed
-    if mis.isDownwardClosed
-        updateReducedMargin!(mis, idx)
-    end
-    isValid
+    updateReducedMargin!(mis, idx)
+    true
 end
 
 """
@@ -239,7 +245,7 @@ function findReducedFrontier(mis::MultiIndexSet{d}) where {d}
     frontier
 end
 
-# Given a subset of indices, find the minimal subset of the mset that contains them
+# Given a subset of indices, find the minimal downward closed subset of the mset that contains them
 function subsetCompletion(mset::MultiIndexSet{d}, indices::AbstractVector{Int}) where {d}
     completion = Set{Int}(indices)
     for idx in indices

@@ -16,6 +16,26 @@
     @test !isDownwardClosed(mset_5)
 end
 
+@testset "push!" begin
+    d, p = 5, 10
+    mset = CreateTotalOrder(d, p)
+    # Copy necessary due to inplace modification during push!
+    rm = copy(mset.reduced_margin)
+    # Expected size of the reduced margin
+    @test length(rm) == binomial(d+p+1,d)-binomial(d+p,d)
+    for midx in rm
+        is_added = push!(mset, midx)
+        # Just fail if something isn't added
+        is_added || @test false
+    end
+    @test true
+    mset_2 = CreateTotalOrder(d, p+1)
+    mset_set = Set(mset.indices)
+    mset_2_set = Set(mset_2.indices)
+    @test mset_set == mset_2_set
+    @test !push!(mset, SVector{d}(ones(Int,d)))
+end
+
 @testset "Backward Ancestors" begin
     d, p = 5, 10
     mset = CreateTotalOrder(d, p)
