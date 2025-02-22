@@ -1,4 +1,5 @@
 using MultiIndexing
+import AcceleratedKernels as AK
 using Test, StaticArrays, Random
 
 function create_example_curved(rng, d, p, zero_dim = true, base=0.5)
