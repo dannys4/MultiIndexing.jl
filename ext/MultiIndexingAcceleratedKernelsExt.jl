@@ -1,8 +1,9 @@
 module MultiIndexingAcceleratedKernelsExt
     using MultiIndexing
+    using MultiIndexing: FixedMultiIndexSet
     import AcceleratedKernels as AK
 
-    function FixedMultiIndexSet(fmset::FixedMultiIndexSet{d,T}, backend::AK.Backend) where {d,U,T<:AbstractVector{U}}
+    function MultiIndexing.FixedMultiIndexSet(fmset::FixedMultiIndexSet{d,T}, backend::AK.Backend) where {d,U,T<:AbstractVector{U}}
         (;starts,nz_indices,nz_values,max_orders) = fmset
         starts_dev = AK.allocate(backend, U, size(starts))
         nz_indices_dev = AK.allocate(backend, U, size(nz_indices))
