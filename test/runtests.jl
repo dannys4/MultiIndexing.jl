@@ -1,5 +1,5 @@
 using MultiIndexing
-using Test, StaticArrays, Random
+using Test, StaticArrays, Random, KernelAbstractions
 
 include("test_utils.jl")
 
