@@ -15,7 +15,7 @@ using Random
     @test fmset.nz_indices == nz_indices
     @test fmset.nz_values == nz_values
     @test fmset.max_orders == SVector{d}(fill(p, d))
-    fmset_2 = FixedMultiIndexSet(fmset, AK.CPU())
+    fmset_2 = FixedMultiIndexSet(fmset, CPU())
     @test length(fmset_2) == length(mset)
     @test fmset_2.starts == starts
     @test fmset_2.nz_indices == nz_indices

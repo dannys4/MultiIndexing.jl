@@ -1,6 +1,6 @@
 [deps]
-AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
