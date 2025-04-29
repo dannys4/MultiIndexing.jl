@@ -3,7 +3,7 @@ export allBackwardAncestors, findReducedFrontier
 export isDownwardClosed, subsetCompletion
 
 using StaticArrays, LinearAlgebra
-import Base: getindex, push!, length, iterate
+import Base: getindex, push!, length, size, iterate
 
 """
 Represents a set of multi-indices
@@ -51,12 +51,18 @@ function MultiIndexSet(indices_mat::AbstractMatrix{Int}, limit::T = NoLimiter,
 end
 
 # Some helper functions
-function Base.getindex(mis::MultiIndexSet{d}, i) where {d}
+function Base.getindex(mis::MultiIndexSet, i)
     mis.indices[i]
 end
 
-function Base.length(mis::MultiIndexSet{d}) where {d}
+"Number of multi-indices in the set"
+function Base.length(mis::MultiIndexSet)
     length(mis.indices)
+end
+
+"(Dimension, length) of multi-index set"
+function Base.size(mis::MultiIndexSet{d}) where {d}
+    (d, length(mis))
 end
 
 function Base.iterate(mis::MultiIndexSet{d},

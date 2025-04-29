@@ -10,6 +10,7 @@ using Random
     nz_values = nz_info[:,1]
     nz_indices = nz_info[:,2]
     fmset = FixedMultiIndexSet(mset)
+    @test size(fmset) == size(mset)
     @test length(fmset) == length(mset)
     @test fmset.starts == starts
     @test fmset.nz_indices == nz_indices

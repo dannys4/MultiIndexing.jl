@@ -11,6 +11,7 @@
         # p = 1
         mset = CreateTotalOrder(d, 1)
         @test length(mset) == d + 1
+        @test size(mset) == (d, d+1)
         @test length(mset) == length(unique(mset.indices))
         @test mset[1] == SVector{d}(zeros(Int, d))
         @test all(sum.(mset)[2:end] .== 1)
@@ -25,6 +26,7 @@
 
         # Test matrix creation
         mset, last_start = MultiIndexing.CreateTotalOrder_matrix(d, p)
+        @test size(mset, 1) == d
         @test all(sum(mset[:, last_start:end], dims = 1) .== p) # Last start is wrong
         @test all(sum(mset[:, 1:(last_start - 1)], dims = 1) .< p) # First part is wrong
         @test mset == hardcoded_mset # Matrix is wrong
