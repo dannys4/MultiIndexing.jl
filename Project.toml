@@ -1,7 +1,7 @@
 name = "MultiIndexing"
 uuid = "b97ecbdf-1535-430e-a7c7-b5702749f368"
 authors = ["Daniel Sharp <dannys4@mit.edu> and contributors"]
-version = "1.2.0"
+version = "1.2.1"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
