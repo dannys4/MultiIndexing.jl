@@ -45,10 +45,17 @@ function FixedMultiIndexSet(mset::MultiIndexSet{d}) where {d}
     FixedMultiIndexSet{d, Vector{Int}}(starts, nz_indices, nz_values, max_orders)
 end
 
-"Number of multi-indices in the multi-index set"
+"""
+    length(fmset::FixedMultiIndexSet)
+Number of multi-indices in the fixed multi-index set
+"""
 Base.length(fmset::FixedMultiIndexSet) = length(fmset.starts) - 1
 
-"(Dimension, length) of multi-index set"
+"""
+    size(fmset::FixedMultiIndexSet, [dims])
+(Dimension, length) of fixed multi-index set
+"""
 function Base.size(fmset::FixedMultiIndexSet{d}) where {d}
     d, length(fmset)
 end
+Base.size(fmset::FixedMultiIndexSet, dims) = size(fmset)[dims]

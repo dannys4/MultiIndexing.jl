@@ -12,6 +12,8 @@
         mset = CreateTotalOrder(d, 1)
         @test length(mset) == d + 1
         @test size(mset) == (d, d+1)
+        @test size(mset,1) == d
+        @test size(mset,2) == d+1
         @test length(mset) == length(unique(mset.indices))
         @test mset[1] == SVector{d}(zeros(Int, d))
         @test all(sum.(mset)[2:end] .== 1)

@@ -55,15 +55,22 @@ function Base.getindex(mis::MultiIndexSet, i)
     mis.indices[i]
 end
 
-"Number of multi-indices in the set"
+"""
+    length(mis::MultiIndexSet)
+Number of multi-indices in the set
+"""
 function Base.length(mis::MultiIndexSet)
     length(mis.indices)
 end
 
-"(Dimension, length) of multi-index set"
+"""
+    size(mis::MultiIndexSet, [dims])
+(Dimension, length) of multi-index set
+"""
 function Base.size(mis::MultiIndexSet{d}) where {d}
     (d, length(mis))
 end
+Base.size(mis::MultiIndexSet, dims) = size(mis)[dims]
 
 function Base.iterate(mis::MultiIndexSet{d},
         state::Int = 1)::Union{Tuple{SVector{d, Int}, Int}, Nothing} where {d}
